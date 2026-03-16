@@ -1,15 +1,22 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: PocketTask API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: tasks
+    description: Task operations
+  - name: users
+    description: User operations
+  - name: applications
+    description: Task application operations
 paths:
   /healthz:
     get:
@@ -24,6 +31,276 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/user:
+    get:
+      operationId: getCurrentAuthUser
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current auth user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetCurrentAuthUserResponse"
+
+  /tasks:
+    get:
+      operationId: getTasks
+      tags: [tasks]
+      summary: List all tasks
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, in_progress, completed, cancelled]
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lng
+          in: query
+          schema:
+            type: number
+        - name: radius
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskListResponse"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a new task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskBody"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "401":
+          description: Unauthorized
+
+  /tasks/{id}:
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: Get task by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskWithDetails"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskBody"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Unauthorized
+
+  /tasks/{id}/applications:
+    get:
+      operationId: getTaskApplications
+      tags: [applications]
+      summary: Get applications for a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Applications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationListResponse"
+    post:
+      operationId: applyToTask
+      tags: [applications]
+      summary: Apply to a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyToTaskBody"
+      responses:
+        "201":
+          description: Application created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "401":
+          description: Unauthorized
+
+  /applications/{id}:
+    patch:
+      operationId: updateApplication
+      tags: [applications]
+      summary: Update application status (accept/reject)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateApplicationBody"
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "401":
+          description: Unauthorized
+
+  /users/me:
+    get:
+      operationId: getMyProfile
+      tags: [users]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+    patch:
+      operationId: updateMyProfile
+      tags: [users]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+
+  /users/me/tasks:
+    get:
+      operationId: getMyPostedTasks
+      tags: [users]
+      summary: Get tasks posted by current user
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskListResponse"
+        "401":
+          description: Unauthorized
+
+  /users/me/applications:
+    get:
+      operationId: getMyApplications
+      tags: [users]
+      summary: Get applications by current user
+      responses:
+        "200":
+          description: Applications with task info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationListResponse"
+        "401":
+          description: Unauthorized
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +311,290 @@ components:
       required:
         - status
 
+    GetCurrentAuthUserResponse:
+      type: object
+      properties:
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/AuthUser"
+            - type: "null"
+      required:
+        - user
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        profileImage:
+          type: string
+          nullable: true
+      required:
+        - id
+        - username
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        pay:
+          type: number
+        status:
+          type: string
+          enum: [open, in_progress, completed, cancelled]
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
+        locationName:
+          type: string
+          nullable: true
+        estimatedHours:
+          type: number
+          nullable: true
+        postedById:
+          type: string
+        assignedToId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - description
+        - category
+        - pay
+        - status
+        - postedById
+        - createdAt
+        - updatedAt
+
+    TaskWithDetails:
+      allOf:
+        - $ref: "#/components/schemas/Task"
+        - type: object
+          properties:
+            postedBy:
+              $ref: "#/components/schemas/AuthUser"
+            assignedTo:
+              oneOf:
+                - $ref: "#/components/schemas/AuthUser"
+                - type: "null"
+            applicationCount:
+              type: integer
+          required:
+            - postedBy
+            - applicationCount
+
+    TaskListResponse:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+      required:
+        - tasks
+
+    CreateTaskBody:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 100
+        description:
+          type: string
+          minLength: 10
+        category:
+          type: string
+        pay:
+          type: number
+          minimum: 1
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
+        locationName:
+          type: string
+          nullable: true
+        estimatedHours:
+          type: number
+          nullable: true
+      required:
+        - title
+        - description
+        - category
+        - pay
+
+    UpdateTaskBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        pay:
+          type: number
+        status:
+          type: string
+          enum: [open, in_progress, completed, cancelled]
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
+        locationName:
+          type: string
+          nullable: true
+        estimatedHours:
+          type: number
+          nullable: true
+
+    Application:
+      type: object
+      properties:
+        id:
+          type: integer
+        taskId:
+          type: integer
+        applicantId:
+          type: string
+        message:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, accepted, rejected]
+        createdAt:
+          type: string
+          format: date-time
+        applicant:
+          $ref: "#/components/schemas/AuthUser"
+        task:
+          oneOf:
+            - $ref: "#/components/schemas/Task"
+            - type: "null"
+      required:
+        - id
+        - taskId
+        - applicantId
+        - status
+        - createdAt
+        - applicant
+
+    ApplicationListResponse:
+      type: object
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Application"
+      required:
+        - applications
+
+    ApplyToTaskBody:
+      type: object
+      properties:
+        message:
+          type: string
+          nullable: true
+
+    UpdateApplicationBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [accepted, rejected]
+      required:
+        - status
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        profileImage:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        tasksPosted:
+          type: integer
+        tasksCompleted:
+          type: integer
+        rating:
+          type: number
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - tasksPosted
+        - tasksCompleted
+        - createdAt
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        bio:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
