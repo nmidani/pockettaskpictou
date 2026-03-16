@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
@@ -21,10 +21,19 @@ export interface GetCurrentAuthUserResponse {
   user: AuthUser | null;
 }
 
+export type TaskPaymentMethod =
+  (typeof TaskPaymentMethod)[keyof typeof TaskPaymentMethod];
+
+export const TaskPaymentMethod = {
+  cash: "cash",
+  etransfer: "etransfer",
+} as const;
+
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
 
 export const TaskStatus = {
   open: "open",
+  claimed: "claimed",
   in_progress: "in_progress",
   completed: "completed",
   cancelled: "cancelled",
@@ -36,12 +45,16 @@ export interface Task {
   description: string;
   category: string;
   pay: number;
+  paymentMethod: TaskPaymentMethod;
+  estimatedHours?: number | null;
   status: TaskStatus;
   lat?: number | null;
   lng?: number | null;
   locationName?: string | null;
-  estimatedHours?: number | null;
+  town?: string | null;
   postedById: string;
+  claimedById?: string | null;
+  claimedAt?: string | null;
   assignedToId?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -49,13 +62,21 @@ export interface Task {
 
 export type TaskWithDetails = Task & {
   postedBy: AuthUser;
-  assignedTo?: AuthUser | null;
+  claimedBy?: AuthUser | null;
   applicationCount: number;
 };
 
 export interface TaskListResponse {
   tasks: Task[];
 }
+
+export type CreateTaskBodyPaymentMethod =
+  (typeof CreateTaskBodyPaymentMethod)[keyof typeof CreateTaskBodyPaymentMethod];
+
+export const CreateTaskBodyPaymentMethod = {
+  cash: "cash",
+  etransfer: "etransfer",
+} as const;
 
 export interface CreateTaskBody {
   /**
@@ -68,17 +89,28 @@ export interface CreateTaskBody {
   category: string;
   /** @minimum 1 */
   pay: number;
+  paymentMethod?: CreateTaskBodyPaymentMethod;
+  estimatedHours?: number | null;
   lat?: number | null;
   lng?: number | null;
   locationName?: string | null;
-  estimatedHours?: number | null;
+  town?: string | null;
 }
+
+export type UpdateTaskBodyPaymentMethod =
+  (typeof UpdateTaskBodyPaymentMethod)[keyof typeof UpdateTaskBodyPaymentMethod];
+
+export const UpdateTaskBodyPaymentMethod = {
+  cash: "cash",
+  etransfer: "etransfer",
+} as const;
 
 export type UpdateTaskBodyStatus =
   (typeof UpdateTaskBodyStatus)[keyof typeof UpdateTaskBodyStatus];
 
 export const UpdateTaskBodyStatus = {
   open: "open",
+  claimed: "claimed",
   in_progress: "in_progress",
   completed: "completed",
   cancelled: "cancelled",
@@ -89,11 +121,13 @@ export interface UpdateTaskBody {
   description?: string;
   category?: string;
   pay?: number;
+  paymentMethod?: UpdateTaskBodyPaymentMethod;
   status?: UpdateTaskBodyStatus;
+  estimatedHours?: number | null;
   lat?: number | null;
   lng?: number | null;
   locationName?: string | null;
-  estimatedHours?: number | null;
+  town?: string | null;
 }
 
 export type ApplicationStatus =
@@ -136,23 +170,102 @@ export interface UpdateApplicationBody {
   status: UpdateApplicationBodyStatus;
 }
 
+export interface ChatMessage {
+  id: number;
+  taskId: number;
+  senderId: string;
+  content: string;
+  read: boolean;
+  createdAt: string;
+  sender: AuthUser;
+}
+
+export interface MessageListResponse {
+  messages: ChatMessage[];
+}
+
+export interface SendMessageBody {
+  /** @minLength 1 */
+  content: string;
+}
+
+export interface Conversation {
+  taskId: number;
+  taskTitle: string;
+  otherUser: AuthUser;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
+  unreadCount: number;
+}
+
+export interface ConversationListResponse {
+  conversations: Conversation[];
+}
+
+export interface RatingResponse {
+  id: number;
+  taskId: number;
+  raterId: string;
+  ratedId: string;
+  rating: number;
+  review?: string | null;
+  createdAt: string;
+}
+
+export interface UserRatingsResponse {
+  ratings: RatingResponse[];
+  averageRating?: number | null;
+  totalCount: number;
+}
+
+export interface SubmitRatingBody {
+  taskId: number;
+  ratedId: string;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  rating: number;
+  review?: string | null;
+}
+
+export type SubmitReportBodyTargetType =
+  (typeof SubmitReportBodyTargetType)[keyof typeof SubmitReportBodyTargetType];
+
+export const SubmitReportBodyTargetType = {
+  user: "user",
+  task: "task",
+} as const;
+
+export interface SubmitReportBody {
+  targetType: SubmitReportBodyTargetType;
+  targetId: string;
+  reason: string;
+  details?: string | null;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
   firstName?: string | null;
   lastName?: string | null;
   profileImage?: string | null;
+  role?: string | null;
+  town?: string | null;
   bio?: string | null;
   phone?: string | null;
   tasksPosted: number;
   tasksCompleted: number;
   rating?: number | null;
+  reviewCount: number;
   createdAt: string;
 }
 
 export interface UpdateProfileBody {
   bio?: string | null;
   phone?: string | null;
+  role?: string | null;
+  town?: string | null;
   firstName?: string | null;
   lastName?: string | null;
 }
@@ -161,20 +274,12 @@ export interface SuccessResponse {
   success: boolean;
 }
 
+export interface ErrorResponse {
+  error: string;
+}
+
 export type GetTasksParams = {
-  status?: GetTasksStatus;
+  status?: string;
   category?: string;
-  lat?: number;
-  lng?: number;
-  radius?: number;
+  town?: string;
 };
-
-export type GetTasksStatus =
-  (typeof GetTasksStatus)[keyof typeof GetTasksStatus];
-
-export const GetTasksStatus = {
-  open: "open",
-  in_progress: "in_progress",
-  completed: "completed",
-  cancelled: "cancelled",
-} as const;

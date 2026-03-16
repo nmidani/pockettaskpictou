@@ -3,8 +3,9 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
+import type { TaskPaymentMethod } from "./taskPaymentMethod";
 import type { TaskStatus } from "./taskStatus";
 
 export interface Task {
@@ -13,12 +14,16 @@ export interface Task {
   description: string;
   category: string;
   pay: number;
+  paymentMethod: TaskPaymentMethod;
+  estimatedHours?: number | null;
   status: TaskStatus;
   lat?: number | null;
   lng?: number | null;
   locationName?: string | null;
-  estimatedHours?: number | null;
+  town?: string | null;
   postedById: string;
+  claimedById?: string | null;
+  claimedAt?: Date | null;
   assignedToId?: string | null;
   createdAt: Date;
   updatedAt: Date;

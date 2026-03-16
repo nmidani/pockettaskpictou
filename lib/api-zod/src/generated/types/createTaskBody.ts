@@ -3,8 +3,9 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
+import type { CreateTaskBodyPaymentMethod } from "./createTaskBodyPaymentMethod";
 
 export interface CreateTaskBody {
   /**
@@ -17,8 +18,10 @@ export interface CreateTaskBody {
   category: string;
   /** @minimum 1 */
   pay: number;
+  paymentMethod?: CreateTaskBodyPaymentMethod;
+  estimatedHours?: number | null;
   lat?: number | null;
   lng?: number | null;
   locationName?: string | null;
-  estimatedHours?: number | null;
+  town?: string | null;
 }

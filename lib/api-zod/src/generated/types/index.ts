@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export * from "./application";
@@ -11,19 +11,32 @@ export * from "./applicationListResponse";
 export * from "./applicationStatus";
 export * from "./applyToTaskBody";
 export * from "./authUser";
+export * from "./chatMessage";
+export * from "./conversation";
+export * from "./conversationListResponse";
 export * from "./createTaskBody";
+export * from "./createTaskBodyPaymentMethod";
+export * from "./errorResponse";
 export * from "./getCurrentAuthUserResponse";
 export * from "./getTasksParams";
-export * from "./getTasksStatus";
 export * from "./healthStatus";
+export * from "./messageListResponse";
+export * from "./ratingResponse";
+export * from "./sendMessageBody";
+export * from "./submitRatingBody";
+export * from "./submitReportBody";
+export * from "./submitReportBodyTargetType";
 export * from "./successResponse";
 export * from "./task";
 export * from "./taskListResponse";
+export * from "./taskPaymentMethod";
 export * from "./taskStatus";
 export * from "./taskWithDetails";
 export * from "./updateApplicationBody";
 export * from "./updateApplicationBodyStatus";
 export * from "./updateProfileBody";
 export * from "./updateTaskBody";
+export * from "./updateTaskBodyPaymentMethod";
 export * from "./updateTaskBodyStatus";
 export * from "./userProfile";
+export * from "./userRatingsResponse";

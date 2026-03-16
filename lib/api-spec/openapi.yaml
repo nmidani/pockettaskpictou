@@ -1,29 +1,26 @@
 openapi: 3.1.0
 info:
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: PocketTask API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
   - name: auth
-    description: Authentication operations
   - name: tasks
-    description: Task operations
-  - name: users
-    description: User operations
   - name: applications
-    description: Task application operations
+  - name: users
+  - name: messages
+  - name: ratings
+  - name: reports
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -55,23 +52,14 @@ paths:
           in: query
           schema:
             type: string
-            enum: [open, in_progress, completed, cancelled]
         - name: category
           in: query
           schema:
             type: string
-        - name: lat
+        - name: town
           in: query
           schema:
-            type: number
-        - name: lng
-          in: query
-          schema:
-            type: number
-        - name: radius
-          in: query
-          schema:
-            type: number
+            type: string
       responses:
         "200":
           description: List of tasks
@@ -142,10 +130,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Task"
-        "401":
-          description: Unauthorized
-        "403":
-          description: Forbidden
     delete:
       operationId: deleteTask
       tags: [tasks]
@@ -163,8 +147,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
-        "401":
-          description: Unauthorized
+
+  /tasks/{id}/claim:
+    post:
+      operationId: claimTask
+      tags: [tasks]
+      summary: Claim a task (first-come first-served)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "409":
+          description: Already claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tasks/{id}/complete:
+    post:
+      operationId: completeTask
+      tags: [tasks]
+      summary: Mark task as completed
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
 
   /tasks/{id}/applications:
     get:
@@ -207,14 +233,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Application"
-        "401":
-          description: Unauthorized
 
   /applications/{id}:
     patch:
       operationId: updateApplication
       tags: [applications]
-      summary: Update application status (accept/reject)
+      summary: Accept/reject application
       parameters:
         - name: id
           in: path
@@ -234,8 +258,105 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Application"
-        "401":
-          description: Unauthorized
+
+  /messages/{taskId}:
+    get:
+      operationId: getMessages
+      tags: [messages]
+      summary: Get messages for a task chat
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageListResponse"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message in task chat
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+
+  /ratings:
+    post:
+      operationId: submitRating
+      tags: [ratings]
+      summary: Submit a rating after task completion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitRatingBody"
+      responses:
+        "201":
+          description: Rating submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatingResponse"
+
+  /ratings/{userId}:
+    get:
+      operationId: getUserRatings
+      tags: [ratings]
+      summary: Get ratings for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User ratings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserRatingsResponse"
+
+  /reports:
+    post:
+      operationId: submitReport
+      tags: [reports]
+      summary: Submit a report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitReportBody"
+      responses:
+        "201":
+          description: Report submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
 
   /users/me:
     get:
@@ -249,8 +370,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserProfile"
-        "401":
-          description: Unauthorized
     patch:
       operationId: updateMyProfile
       tags: [users]
@@ -268,8 +387,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserProfile"
-        "401":
-          description: Unauthorized
 
   /users/me/tasks:
     get:
@@ -283,8 +400,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TaskListResponse"
-        "401":
-          description: Unauthorized
 
   /users/me/applications:
     get:
@@ -293,13 +408,24 @@ paths:
       summary: Get applications by current user
       responses:
         "200":
-          description: Applications with task info
+          description: Applications
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApplicationListResponse"
-        "401":
-          description: Unauthorized
+
+  /users/me/messages:
+    get:
+      operationId: getMyConversations
+      tags: [messages]
+      summary: Get all task conversations for current user
+      responses:
+        "200":
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationListResponse"
 
 components:
   schemas:
@@ -308,8 +434,7 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
     GetCurrentAuthUserResponse:
       type: object
@@ -318,8 +443,7 @@ components:
           oneOf:
             - $ref: "#/components/schemas/AuthUser"
             - type: "null"
-      required:
-        - user
+      required: [user]
 
     AuthUser:
       type: object
@@ -337,9 +461,7 @@ components:
         profileImage:
           type: string
           nullable: true
-      required:
-        - id
-        - username
+      required: [id, username]
 
     Task:
       type: object
@@ -354,9 +476,15 @@ components:
           type: string
         pay:
           type: number
+        paymentMethod:
+          type: string
+          enum: [cash, etransfer]
+        estimatedHours:
+          type: number
+          nullable: true
         status:
           type: string
-          enum: [open, in_progress, completed, cancelled]
+          enum: [open, claimed, in_progress, completed, cancelled]
         lat:
           type: number
           nullable: true
@@ -366,11 +494,18 @@ components:
         locationName:
           type: string
           nullable: true
-        estimatedHours:
-          type: number
+        town:
+          type: string
           nullable: true
         postedById:
           type: string
+        claimedById:
+          type: string
+          nullable: true
+        claimedAt:
+          type: string
+          format: date-time
+          nullable: true
         assignedToId:
           type: string
           nullable: true
@@ -380,16 +515,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required:
-        - id
-        - title
-        - description
-        - category
-        - pay
-        - status
-        - postedById
-        - createdAt
-        - updatedAt
+      required: [id, title, description, category, pay, paymentMethod, status, postedById, createdAt, updatedAt]
 
     TaskWithDetails:
       allOf:
@@ -398,15 +524,13 @@ components:
           properties:
             postedBy:
               $ref: "#/components/schemas/AuthUser"
-            assignedTo:
+            claimedBy:
               oneOf:
                 - $ref: "#/components/schemas/AuthUser"
                 - type: "null"
             applicationCount:
               type: integer
-          required:
-            - postedBy
-            - applicationCount
+          required: [postedBy, applicationCount]
 
     TaskListResponse:
       type: object
@@ -415,8 +539,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Task"
-      required:
-        - tasks
+      required: [tasks]
 
     CreateTaskBody:
       type: object
@@ -433,6 +556,12 @@ components:
         pay:
           type: number
           minimum: 1
+        paymentMethod:
+          type: string
+          enum: [cash, etransfer]
+        estimatedHours:
+          type: number
+          nullable: true
         lat:
           type: number
           nullable: true
@@ -442,14 +571,10 @@ components:
         locationName:
           type: string
           nullable: true
-        estimatedHours:
-          type: number
+        town:
+          type: string
           nullable: true
-      required:
-        - title
-        - description
-        - category
-        - pay
+      required: [title, description, category, pay]
 
     UpdateTaskBody:
       type: object
@@ -462,9 +587,15 @@ components:
           type: string
         pay:
           type: number
+        paymentMethod:
+          type: string
+          enum: [cash, etransfer]
         status:
           type: string
-          enum: [open, in_progress, completed, cancelled]
+          enum: [open, claimed, in_progress, completed, cancelled]
+        estimatedHours:
+          type: number
+          nullable: true
         lat:
           type: number
           nullable: true
@@ -474,8 +605,8 @@ components:
         locationName:
           type: string
           nullable: true
-        estimatedHours:
-          type: number
+        town:
+          type: string
           nullable: true
 
     Application:
@@ -502,13 +633,7 @@ components:
           oneOf:
             - $ref: "#/components/schemas/Task"
             - type: "null"
-      required:
-        - id
-        - taskId
-        - applicantId
-        - status
-        - createdAt
-        - applicant
+      required: [id, taskId, applicantId, status, createdAt, applicant]
 
     ApplicationListResponse:
       type: object
@@ -517,8 +642,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Application"
-      required:
-        - applications
+      required: [applications]
 
     ApplyToTaskBody:
       type: object
@@ -533,8 +657,139 @@ components:
         status:
           type: string
           enum: [accepted, rejected]
-      required:
-        - status
+      required: [status]
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        taskId:
+          type: integer
+        senderId:
+          type: string
+        content:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        sender:
+          $ref: "#/components/schemas/AuthUser"
+      required: [id, taskId, senderId, content, read, createdAt, sender]
+
+    MessageListResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+      required: [messages]
+
+    SendMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+      required: [content]
+
+    Conversation:
+      type: object
+      properties:
+        taskId:
+          type: integer
+        taskTitle:
+          type: string
+        otherUser:
+          $ref: "#/components/schemas/AuthUser"
+        lastMessage:
+          type: string
+          nullable: true
+        lastMessageAt:
+          type: string
+          format: date-time
+          nullable: true
+        unreadCount:
+          type: integer
+      required: [taskId, taskTitle, otherUser, unreadCount]
+
+    ConversationListResponse:
+      type: object
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Conversation"
+      required: [conversations]
+
+    RatingResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        taskId:
+          type: integer
+        raterId:
+          type: string
+        ratedId:
+          type: string
+        rating:
+          type: integer
+        review:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, taskId, raterId, ratedId, rating, createdAt]
+
+    UserRatingsResponse:
+      type: object
+      properties:
+        ratings:
+          type: array
+          items:
+            $ref: "#/components/schemas/RatingResponse"
+        averageRating:
+          type: number
+          nullable: true
+        totalCount:
+          type: integer
+      required: [ratings, totalCount]
+
+    SubmitRatingBody:
+      type: object
+      properties:
+        taskId:
+          type: integer
+        ratedId:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        review:
+          type: string
+          nullable: true
+      required: [taskId, ratedId, rating]
+
+    SubmitReportBody:
+      type: object
+      properties:
+        targetType:
+          type: string
+          enum: [user, task]
+        targetId:
+          type: string
+        reason:
+          type: string
+        details:
+          type: string
+          nullable: true
+      required: [targetType, targetId, reason]
 
     UserProfile:
       type: object
@@ -552,6 +807,12 @@ components:
         profileImage:
           type: string
           nullable: true
+        role:
+          type: string
+          nullable: true
+        town:
+          type: string
+          nullable: true
         bio:
           type: string
           nullable: true
@@ -565,15 +826,12 @@ components:
         rating:
           type: number
           nullable: true
+        reviewCount:
+          type: integer
         createdAt:
           type: string
           format: date-time
-      required:
-        - id
-        - username
-        - tasksPosted
-        - tasksCompleted
-        - createdAt
+      required: [id, username, tasksPosted, tasksCompleted, reviewCount, createdAt]
 
     UpdateProfileBody:
       type: object
@@ -582,6 +840,12 @@ components:
           type: string
           nullable: true
         phone:
+          type: string
+          nullable: true
+        role:
+          type: string
+          nullable: true
+        town:
           type: string
           nullable: true
         firstName:
@@ -596,5 +860,11 @@ components:
       properties:
         success:
           type: boolean
-      required:
-        - success
+      required: [success]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]

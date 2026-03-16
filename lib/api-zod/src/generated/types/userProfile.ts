@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export interface UserProfile {
@@ -12,10 +12,13 @@ export interface UserProfile {
   firstName?: string | null;
   lastName?: string | null;
   profileImage?: string | null;
+  role?: string | null;
+  town?: string | null;
   bio?: string | null;
   phone?: string | null;
   tasksPosted: number;
   tasksCompleted: number;
   rating?: number | null;
+  reviewCount: number;
   createdAt: Date;
 }

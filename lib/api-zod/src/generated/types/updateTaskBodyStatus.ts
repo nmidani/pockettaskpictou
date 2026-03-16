@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export type UpdateTaskBodyStatus =
@@ -11,6 +11,7 @@ export type UpdateTaskBodyStatus =
 
 export const UpdateTaskBodyStatus = {
   open: "open",
+  claimed: "claimed",
   in_progress: "in_progress",
   completed: "completed",
   cancelled: "cancelled",

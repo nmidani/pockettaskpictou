@@ -4,6 +4,9 @@ import authRouter from "./auth";
 import tasksRouter from "./tasks";
 import applicationsRouter from "./applications";
 import usersRouter from "./users";
+import messagesRouter from "./messages";
+import ratingsRouter from "./ratings";
+import reportsRouter from "./reports";
 
 const router: IRouter = Router();
 
@@ -12,5 +15,8 @@ router.use(authRouter);
 router.use(tasksRouter);
 router.use(applicationsRouter);
 router.use(usersRouter);
+router.use(messagesRouter);
+router.use(ratingsRouter);
+router.use(reportsRouter);
 
 export default router;

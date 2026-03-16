@@ -3,12 +3,14 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export interface UpdateProfileBody {
   bio?: string | null;
   phone?: string | null;
+  role?: string | null;
+  town?: string | null;
   firstName?: string | null;
   lastName?: string | null;
 }

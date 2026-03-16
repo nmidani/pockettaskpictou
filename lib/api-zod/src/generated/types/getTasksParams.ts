@@ -3,14 +3,11 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
-import type { GetTasksStatus } from "./getTasksStatus";
 
 export type GetTasksParams = {
-  status?: GetTasksStatus;
+  status?: string;
   category?: string;
-  lat?: number;
-  lng?: number;
-  radius?: number;
+  town?: string;
 };

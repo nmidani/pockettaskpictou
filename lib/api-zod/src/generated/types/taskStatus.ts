@@ -3,13 +3,14 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
 
 export const TaskStatus = {
   open: "open",
+  claimed: "claimed",
   in_progress: "in_progress",
   completed: "completed",
   cancelled: "cancelled",

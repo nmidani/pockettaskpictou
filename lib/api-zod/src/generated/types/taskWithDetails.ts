@@ -3,13 +3,13 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { AuthUser } from "./authUser";
 import type { Task } from "./task";
 
 export type TaskWithDetails = Task & {
   postedBy: AuthUser;
-  assignedTo?: AuthUser | null;
+  claimedBy?: AuthUser | null;
   applicationCount: number;
 };

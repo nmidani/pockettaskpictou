@@ -3,12 +3,11 @@
  * Do not edit manually.
  * Api
  * PocketTask API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -35,13 +34,9 @@ export const GetCurrentAuthUserResponse = zod.object({
  * @summary List all tasks
  */
 export const GetTasksQueryParams = zod.object({
-  status: zod
-    .enum(["open", "in_progress", "completed", "cancelled"])
-    .optional(),
+  status: zod.coerce.string().optional(),
   category: zod.coerce.string().optional(),
-  lat: zod.coerce.number().optional(),
-  lng: zod.coerce.number().optional(),
-  radius: zod.coerce.number().optional(),
+  town: zod.coerce.string().optional(),
 });
 
 export const GetTasksResponse = zod.object({
@@ -52,12 +47,22 @@ export const GetTasksResponse = zod.object({
       description: zod.string(),
       category: zod.string(),
       pay: zod.number(),
-      status: zod.enum(["open", "in_progress", "completed", "cancelled"]),
+      paymentMethod: zod.enum(["cash", "etransfer"]),
+      estimatedHours: zod.number().nullish(),
+      status: zod.enum([
+        "open",
+        "claimed",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ]),
       lat: zod.number().nullish(),
       lng: zod.number().nullish(),
       locationName: zod.string().nullish(),
-      estimatedHours: zod.number().nullish(),
+      town: zod.string().nullish(),
       postedById: zod.string(),
+      claimedById: zod.string().nullish(),
+      claimedAt: zod.date().nullish(),
       assignedToId: zod.string().nullish(),
       createdAt: zod.date(),
       updatedAt: zod.date(),
@@ -78,10 +83,12 @@ export const CreateTaskBody = zod.object({
   description: zod.string().min(createTaskBodyDescriptionMin),
   category: zod.string(),
   pay: zod.number().min(1),
+  paymentMethod: zod.enum(["cash", "etransfer"]).optional(),
+  estimatedHours: zod.number().nullish(),
   lat: zod.number().nullish(),
   lng: zod.number().nullish(),
   locationName: zod.string().nullish(),
-  estimatedHours: zod.number().nullish(),
+  town: zod.string().nullish(),
 });
 
 /**
@@ -98,12 +105,22 @@ export const GetTaskResponse = zod
     description: zod.string(),
     category: zod.string(),
     pay: zod.number(),
-    status: zod.enum(["open", "in_progress", "completed", "cancelled"]),
+    paymentMethod: zod.enum(["cash", "etransfer"]),
+    estimatedHours: zod.number().nullish(),
+    status: zod.enum([
+      "open",
+      "claimed",
+      "in_progress",
+      "completed",
+      "cancelled",
+    ]),
     lat: zod.number().nullish(),
     lng: zod.number().nullish(),
     locationName: zod.string().nullish(),
-    estimatedHours: zod.number().nullish(),
+    town: zod.string().nullish(),
     postedById: zod.string(),
+    claimedById: zod.string().nullish(),
+    claimedAt: zod.date().nullish(),
     assignedToId: zod.string().nullish(),
     createdAt: zod.date(),
     updatedAt: zod.date(),
@@ -117,7 +134,7 @@ export const GetTaskResponse = zod
         lastName: zod.string().nullish(),
         profileImage: zod.string().nullish(),
       }),
-      assignedTo: zod
+      claimedBy: zod
         .union([
           zod.object({
             id: zod.string(),
@@ -145,13 +162,15 @@ export const UpdateTaskBody = zod.object({
   description: zod.string().optional(),
   category: zod.string().optional(),
   pay: zod.number().optional(),
+  paymentMethod: zod.enum(["cash", "etransfer"]).optional(),
   status: zod
-    .enum(["open", "in_progress", "completed", "cancelled"])
+    .enum(["open", "claimed", "in_progress", "completed", "cancelled"])
     .optional(),
+  estimatedHours: zod.number().nullish(),
   lat: zod.number().nullish(),
   lng: zod.number().nullish(),
   locationName: zod.string().nullish(),
-  estimatedHours: zod.number().nullish(),
+  town: zod.string().nullish(),
 });
 
 export const UpdateTaskResponse = zod.object({
@@ -160,12 +179,22 @@ export const UpdateTaskResponse = zod.object({
   description: zod.string(),
   category: zod.string(),
   pay: zod.number(),
-  status: zod.enum(["open", "in_progress", "completed", "cancelled"]),
+  paymentMethod: zod.enum(["cash", "etransfer"]),
+  estimatedHours: zod.number().nullish(),
+  status: zod.enum([
+    "open",
+    "claimed",
+    "in_progress",
+    "completed",
+    "cancelled",
+  ]),
   lat: zod.number().nullish(),
   lng: zod.number().nullish(),
   locationName: zod.string().nullish(),
-  estimatedHours: zod.number().nullish(),
+  town: zod.string().nullish(),
   postedById: zod.string(),
+  claimedById: zod.string().nullish(),
+  claimedAt: zod.date().nullish(),
   assignedToId: zod.string().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
@@ -180,6 +209,74 @@ export const DeleteTaskParams = zod.object({
 
 export const DeleteTaskResponse = zod.object({
   success: zod.boolean(),
+});
+
+/**
+ * @summary Claim a task (first-come first-served)
+ */
+export const ClaimTaskParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ClaimTaskResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string(),
+  category: zod.string(),
+  pay: zod.number(),
+  paymentMethod: zod.enum(["cash", "etransfer"]),
+  estimatedHours: zod.number().nullish(),
+  status: zod.enum([
+    "open",
+    "claimed",
+    "in_progress",
+    "completed",
+    "cancelled",
+  ]),
+  lat: zod.number().nullish(),
+  lng: zod.number().nullish(),
+  locationName: zod.string().nullish(),
+  town: zod.string().nullish(),
+  postedById: zod.string(),
+  claimedById: zod.string().nullish(),
+  claimedAt: zod.date().nullish(),
+  assignedToId: zod.string().nullish(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+
+/**
+ * @summary Mark task as completed
+ */
+export const CompleteTaskParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CompleteTaskResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string(),
+  category: zod.string(),
+  pay: zod.number(),
+  paymentMethod: zod.enum(["cash", "etransfer"]),
+  estimatedHours: zod.number().nullish(),
+  status: zod.enum([
+    "open",
+    "claimed",
+    "in_progress",
+    "completed",
+    "cancelled",
+  ]),
+  lat: zod.number().nullish(),
+  lng: zod.number().nullish(),
+  locationName: zod.string().nullish(),
+  town: zod.string().nullish(),
+  postedById: zod.string(),
+  claimedById: zod.string().nullish(),
+  claimedAt: zod.date().nullish(),
+  assignedToId: zod.string().nullish(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
 });
 
 /**
@@ -213,12 +310,22 @@ export const GetTaskApplicationsResponse = zod.object({
             description: zod.string(),
             category: zod.string(),
             pay: zod.number(),
-            status: zod.enum(["open", "in_progress", "completed", "cancelled"]),
+            paymentMethod: zod.enum(["cash", "etransfer"]),
+            estimatedHours: zod.number().nullish(),
+            status: zod.enum([
+              "open",
+              "claimed",
+              "in_progress",
+              "completed",
+              "cancelled",
+            ]),
             lat: zod.number().nullish(),
             lng: zod.number().nullish(),
             locationName: zod.string().nullish(),
-            estimatedHours: zod.number().nullish(),
+            town: zod.string().nullish(),
             postedById: zod.string(),
+            claimedById: zod.string().nullish(),
+            claimedAt: zod.date().nullish(),
             assignedToId: zod.string().nullish(),
             createdAt: zod.date(),
             updatedAt: zod.date(),
@@ -242,7 +349,7 @@ export const ApplyToTaskBody = zod.object({
 });
 
 /**
- * @summary Update application status (accept/reject)
+ * @summary Accept/reject application
  */
 export const UpdateApplicationParams = zod.object({
   id: zod.coerce.number(),
@@ -274,12 +381,22 @@ export const UpdateApplicationResponse = zod.object({
         description: zod.string(),
         category: zod.string(),
         pay: zod.number(),
-        status: zod.enum(["open", "in_progress", "completed", "cancelled"]),
+        paymentMethod: zod.enum(["cash", "etransfer"]),
+        estimatedHours: zod.number().nullish(),
+        status: zod.enum([
+          "open",
+          "claimed",
+          "in_progress",
+          "completed",
+          "cancelled",
+        ]),
         lat: zod.number().nullish(),
         lng: zod.number().nullish(),
         locationName: zod.string().nullish(),
-        estimatedHours: zod.number().nullish(),
+        town: zod.string().nullish(),
         postedById: zod.string(),
+        claimedById: zod.string().nullish(),
+        claimedAt: zod.date().nullish(),
         assignedToId: zod.string().nullish(),
         createdAt: zod.date(),
         updatedAt: zod.date(),
@@ -287,6 +404,89 @@ export const UpdateApplicationResponse = zod.object({
       zod.null(),
     ])
     .optional(),
+});
+
+/**
+ * @summary Get messages for a task chat
+ */
+export const GetMessagesParams = zod.object({
+  taskId: zod.coerce.number(),
+});
+
+export const GetMessagesResponse = zod.object({
+  messages: zod.array(
+    zod.object({
+      id: zod.number(),
+      taskId: zod.number(),
+      senderId: zod.string(),
+      content: zod.string(),
+      read: zod.boolean(),
+      createdAt: zod.date(),
+      sender: zod.object({
+        id: zod.string(),
+        username: zod.string(),
+        firstName: zod.string().nullish(),
+        lastName: zod.string().nullish(),
+        profileImage: zod.string().nullish(),
+      }),
+    }),
+  ),
+});
+
+/**
+ * @summary Send a message in task chat
+ */
+export const SendMessageParams = zod.object({
+  taskId: zod.coerce.number(),
+});
+
+export const SendMessageBody = zod.object({
+  content: zod.string().min(1),
+});
+
+/**
+ * @summary Submit a rating after task completion
+ */
+export const submitRatingBodyRatingMax = 5;
+
+export const SubmitRatingBody = zod.object({
+  taskId: zod.number(),
+  ratedId: zod.string(),
+  rating: zod.number().min(1).max(submitRatingBodyRatingMax),
+  review: zod.string().nullish(),
+});
+
+/**
+ * @summary Get ratings for a user
+ */
+export const GetUserRatingsParams = zod.object({
+  userId: zod.coerce.string(),
+});
+
+export const GetUserRatingsResponse = zod.object({
+  ratings: zod.array(
+    zod.object({
+      id: zod.number(),
+      taskId: zod.number(),
+      raterId: zod.string(),
+      ratedId: zod.string(),
+      rating: zod.number(),
+      review: zod.string().nullish(),
+      createdAt: zod.date(),
+    }),
+  ),
+  averageRating: zod.number().nullish(),
+  totalCount: zod.number(),
+});
+
+/**
+ * @summary Submit a report
+ */
+export const SubmitReportBody = zod.object({
+  targetType: zod.enum(["user", "task"]),
+  targetId: zod.string(),
+  reason: zod.string(),
+  details: zod.string().nullish(),
 });
 
 /**
@@ -298,11 +498,14 @@ export const GetMyProfileResponse = zod.object({
   firstName: zod.string().nullish(),
   lastName: zod.string().nullish(),
   profileImage: zod.string().nullish(),
+  role: zod.string().nullish(),
+  town: zod.string().nullish(),
   bio: zod.string().nullish(),
   phone: zod.string().nullish(),
   tasksPosted: zod.number(),
   tasksCompleted: zod.number(),
   rating: zod.number().nullish(),
+  reviewCount: zod.number(),
   createdAt: zod.date(),
 });
 
@@ -312,6 +515,8 @@ export const GetMyProfileResponse = zod.object({
 export const UpdateMyProfileBody = zod.object({
   bio: zod.string().nullish(),
   phone: zod.string().nullish(),
+  role: zod.string().nullish(),
+  town: zod.string().nullish(),
   firstName: zod.string().nullish(),
   lastName: zod.string().nullish(),
 });
@@ -322,11 +527,14 @@ export const UpdateMyProfileResponse = zod.object({
   firstName: zod.string().nullish(),
   lastName: zod.string().nullish(),
   profileImage: zod.string().nullish(),
+  role: zod.string().nullish(),
+  town: zod.string().nullish(),
   bio: zod.string().nullish(),
   phone: zod.string().nullish(),
   tasksPosted: zod.number(),
   tasksCompleted: zod.number(),
   rating: zod.number().nullish(),
+  reviewCount: zod.number(),
   createdAt: zod.date(),
 });
 
@@ -341,12 +549,22 @@ export const GetMyPostedTasksResponse = zod.object({
       description: zod.string(),
       category: zod.string(),
       pay: zod.number(),
-      status: zod.enum(["open", "in_progress", "completed", "cancelled"]),
+      paymentMethod: zod.enum(["cash", "etransfer"]),
+      estimatedHours: zod.number().nullish(),
+      status: zod.enum([
+        "open",
+        "claimed",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ]),
       lat: zod.number().nullish(),
       lng: zod.number().nullish(),
       locationName: zod.string().nullish(),
-      estimatedHours: zod.number().nullish(),
+      town: zod.string().nullish(),
       postedById: zod.string(),
+      claimedById: zod.string().nullish(),
+      claimedAt: zod.date().nullish(),
       assignedToId: zod.string().nullish(),
       createdAt: zod.date(),
       updatedAt: zod.date(),
@@ -381,12 +599,22 @@ export const GetMyApplicationsResponse = zod.object({
             description: zod.string(),
             category: zod.string(),
             pay: zod.number(),
-            status: zod.enum(["open", "in_progress", "completed", "cancelled"]),
+            paymentMethod: zod.enum(["cash", "etransfer"]),
+            estimatedHours: zod.number().nullish(),
+            status: zod.enum([
+              "open",
+              "claimed",
+              "in_progress",
+              "completed",
+              "cancelled",
+            ]),
             lat: zod.number().nullish(),
             lng: zod.number().nullish(),
             locationName: zod.string().nullish(),
-            estimatedHours: zod.number().nullish(),
+            town: zod.string().nullish(),
             postedById: zod.string(),
+            claimedById: zod.string().nullish(),
+            claimedAt: zod.date().nullish(),
             assignedToId: zod.string().nullish(),
             createdAt: zod.date(),
             updatedAt: zod.date(),
@@ -394,6 +622,28 @@ export const GetMyApplicationsResponse = zod.object({
           zod.null(),
         ])
         .optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get all task conversations for current user
+ */
+export const GetMyConversationsResponse = zod.object({
+  conversations: zod.array(
+    zod.object({
+      taskId: zod.number(),
+      taskTitle: zod.string(),
+      otherUser: zod.object({
+        id: zod.string(),
+        username: zod.string(),
+        firstName: zod.string().nullish(),
+        lastName: zod.string().nullish(),
+        profileImage: zod.string().nullish(),
+      }),
+      lastMessage: zod.string().nullish(),
+      lastMessageAt: zod.date().nullish(),
+      unreadCount: zod.number(),
     }),
   ),
 });
