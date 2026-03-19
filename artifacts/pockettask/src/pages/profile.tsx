@@ -2,195 +2,269 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { useGetMyProfile, useUpdateMyProfile, getGetMyProfileQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-import { Loader2, Settings, Star, CheckCircle, ListTodo } from "lucide-react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Link } from "wouter";
+import { Loader2, Star, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const profileSchema = z.object({
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  bio: z.string().max(300).optional(),
-  phone: z.string().optional(),
-});
+const TOWNS = ["New Glasgow", "Stellarton", "Trenton", "Westville", "Pictou", "River John", "Abercrombie", "Scotsburn"];
+
+function StarDisplay({ rating }: { rating: number | null | undefined }) {
+  const val = rating ?? 0;
+  return (
+    <div className="flex gap-0.5">
+      {[1,2,3,4,5].map((i) => (
+        <Star key={i} className={`w-4 h-4 ${val >= i ? "fill-[#F5A623] text-[#F5A623]" : "text-gray-300"}`} />
+      ))}
+    </div>
+  );
+}
 
 export default function Profile() {
-  const { user, isAuthenticated } = useAuth();
-  const { data: profile, isLoading } = useGetMyProfile({ query: { enabled: isAuthenticated } });
-  const { mutateAsync: updateProfile, isPending } = useUpdateMyProfile();
-  const { toast } = useToast();
+  const { user, logout } = useAuth();
   const queryClient = useQueryClient();
+  const { data: profile, isLoading } = useGetMyProfile();
+  const { mutateAsync: updateProfile } = useUpdateMyProfile();
 
-  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [ratings, setRatings] = useState<{ rating: number; review?: string | null; createdAt: string }[]>([]);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportDone, setReportDone] = useState(false);
+  const [reportReason, setReportReason] = useState("Did not show up");
 
-  const form = useForm<z.infer<typeof profileSchema>>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      bio: "",
-      phone: "",
-    },
-  });
+  const [form, setForm] = useState({ role: "", town: "", bio: "", phone: "", firstName: "", lastName: "" });
+
+  const needsOnboarding = !profile?.role || !profile?.town;
 
   useEffect(() => {
     if (profile) {
-      form.reset({
-        firstName: profile.firstName || "",
-        lastName: profile.lastName || "",
-        bio: profile.bio || "",
-        phone: profile.phone || "",
+      setForm({
+        role: profile.role ?? "",
+        town: profile.town ?? TOWNS[0],
+        bio: profile.bio ?? "",
+        phone: profile.phone ?? "",
+        firstName: user?.firstName ?? "",
+        lastName: user?.lastName ?? "",
       });
+      if (needsOnboarding) setEditing(true);
     }
-  }, [profile, form]);
+  }, [profile?.id]);
 
-  const onSubmit = async (values: z.infer<typeof profileSchema>) => {
+  useEffect(() => {
+    if (!user?.id) return;
+    fetch(`/api/ratings/${user.id}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setRatings(d.ratings ?? []))
+      .catch(() => {});
+  }, [user?.id]);
+
+  async function handleSave() {
+    setSaving(true);
     try {
-      await updateProfile({ data: values });
+      await updateProfile({ data: { role: form.role, town: form.town, bio: form.bio || null, phone: form.phone || null, firstName: form.firstName || null, lastName: form.lastName || null } });
       queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
-      toast({ title: "Profile updated successfully" });
-      setIsEditOpen(false);
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      setEditing(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } finally {
+      setSaving(false);
     }
-  };
-
-  if (!isAuthenticated) return null; // Let the protected route or Layout handle this
-
-  if (isLoading || !profile) {
-    return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>;
   }
 
+  async function handleReport() {
+    await fetch("/api/reports", {
+      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+      body: JSON.stringify({ targetType: "user", targetId: user?.id, reason: reportReason, details: null }),
+    });
+    setReportDone(true);
+    setReportOpen(false);
+  }
+
+  if (isLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B2A4A]" /></div>;
+
+  const displayName = form.firstName ? `${form.firstName} ${form.lastName}`.trim() : user?.username ?? "Anonymous";
+  const initials = (form.firstName?.[0] ?? user?.username?.[0] ?? "?").toUpperCase();
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 md:py-16 mb-20 md:mb-0">
-      
-      {/* Profile Header Card */}
-      <div className="bg-card rounded-[2.5rem] border border-border shadow-xl shadow-black/5 overflow-hidden relative">
-        <div className="h-32 md:h-48 bg-gradient-to-r from-primary/30 via-accent/20 to-secondary/50 w-full absolute top-0 left-0" />
-        
-        <div className="relative pt-20 md:pt-32 px-6 md:px-12 pb-10 flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8">
-          <Avatar className="w-32 h-32 md:w-40 md:h-40 border-4 border-card shadow-2xl rounded-[2rem] bg-card">
-            <AvatarImage src={profile.profileImage || undefined} className="object-cover" />
-            <AvatarFallback className="text-4xl font-display font-bold bg-primary/10 text-primary">
-              {profile.username.substring(0, 2).toUpperCase()}
-            </AvatarFallback>
+    <div className="max-w-xl mx-auto px-4 py-6 space-y-5">
+      {saved && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" />Profile saved!
+        </div>
+      )}
+
+      {/* Header card */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+        <div className="flex items-center gap-4 mb-4">
+          <Avatar className="w-16 h-16 border-2 border-[#1B2A4A]/20">
+            <AvatarImage src={user?.profileImage ?? undefined} />
+            <AvatarFallback className="bg-[#1B2A4A]/10 text-[#1B2A4A] text-2xl font-bold">{initials}</AvatarFallback>
           </Avatar>
-          
-          <div className="flex-1 text-center md:text-left">
-            <h1 className="text-3xl md:text-4xl font-extrabold text-foreground mb-1 tracking-tight">
-              {profile.firstName ? `${profile.firstName} ${profile.lastName || ''}` : profile.username}
-            </h1>
-            <p className="text-muted-foreground font-medium mb-4">@{profile.username} • Joined {format(new Date(profile.createdAt), 'MMMM yyyy')}</p>
-            
-            {profile.bio && (
-              <p className="text-foreground max-w-xl text-lg leading-relaxed mb-4">
-                "{profile.bio}"
-              </p>
+          <div className="flex-1">
+            <h2 className="text-xl font-extrabold text-[#1B2A4A]">{displayName}</h2>
+            <p className="text-sm text-gray-500">@{user?.username}</p>
+            {profile?.role && (
+              <span className={`inline-block mt-1 text-xs font-bold px-2.5 py-0.5 rounded-full ${profile.role === "task_giver" ? "bg-[#1B2A4A]/10 text-[#1B2A4A]" : "bg-[#F5A623]/15 text-[#F5A623]"}`}>
+                {profile.role === "task_giver" ? "Task Giver" : "Task Taker"}
+              </span>
             )}
           </div>
-          
-          <Button 
-            onClick={() => setIsEditOpen(true)}
-            variant="outline" 
-            className="rounded-full shadow-sm hover:shadow-md transition-all self-center md:self-end md:mb-4"
-          >
-            <Settings className="w-4 h-4 mr-2" />
-            Edit Profile
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="text-center bg-gray-50 rounded-xl py-3">
+            <p className="text-xl font-extrabold text-[#1B2A4A]">{profile?.tasksPosted ?? 0}</p>
+            <p className="text-xs text-gray-500 font-medium">Posted</p>
+          </div>
+          <div className="text-center bg-gray-50 rounded-xl py-3">
+            <p className="text-xl font-extrabold text-[#1B2A4A]">{profile?.tasksCompleted ?? 0}</p>
+            <p className="text-xs text-gray-500 font-medium">Completed</p>
+          </div>
+          <div className="text-center bg-gray-50 rounded-xl py-3">
+            <p className="text-xl font-extrabold text-[#F5A623]">{profile?.rating ? profile.rating.toFixed(1) : "—"}</p>
+            <p className="text-xs text-gray-500 font-medium">Rating</p>
+          </div>
+        </div>
+        {profile?.town && (
+          <p className="text-sm text-gray-500 flex items-center gap-1.5 mb-3">
+            📍 {profile.town}
+          </p>
+        )}
+        {profile?.bio && <p className="text-sm text-gray-600 leading-relaxed">{profile.bio}</p>}
+
+        <div className="flex gap-2 mt-4">
+          <Button onClick={() => setEditing(!editing)} variant="outline" size="sm" className="rounded-xl text-xs font-bold flex-1">
+            {editing ? "Cancel Edit" : "Edit Profile"}
+          </Button>
+          <Button onClick={logout} variant="ghost" size="sm" className="rounded-xl text-xs text-gray-500 hover:text-red-500">
+            Log out
           </Button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-        <Card className="p-6 rounded-3xl border-border flex items-center gap-4 bg-card hover:border-primary/30 transition-colors">
-          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
-            <ListTodo className="w-7 h-7" />
+      {/* Onboarding / Edit form */}
+      {(needsOnboarding || editing) && (
+        <div className="bg-white rounded-2xl border border-[#F5A623]/30 p-5 shadow-sm">
+          {needsOnboarding && (
+            <div className="mb-4">
+              <h3 className="font-bold text-[#1B2A4A] text-lg">Complete Your Profile</h3>
+              <p className="text-sm text-gray-500">Set up your account to start posting or claiming tasks.</p>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {/* Role */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">I want to…</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setForm((f) => ({ ...f, role: "task_giver" }))}
+                  className={`p-3 rounded-xl border text-sm font-bold transition-all text-center ${form.role === "task_giver" ? "bg-[#1B2A4A] text-white border-[#1B2A4A]" : "bg-white border-gray-200 text-gray-600"}`}>
+                  📋 Post Tasks<br /><span className="text-xs font-normal opacity-70">I'm a Task Giver</span>
+                </button>
+                <button type="button" onClick={() => setForm((f) => ({ ...f, role: "task_taker" }))}
+                  className={`p-3 rounded-xl border text-sm font-bold transition-all text-center ${form.role === "task_taker" ? "bg-[#F5A623] text-white border-[#F5A623]" : "bg-white border-gray-200 text-gray-600"}`}>
+                  💰 Earn Money<br /><span className="text-xs font-normal opacity-70">I'm a Task Taker</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Name */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">First Name</label>
+                <input value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+                  placeholder="Jane" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Last Name</label>
+                <input value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                  placeholder="Smith" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20" />
+              </div>
+            </div>
+
+            {/* Town */}
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">Your Town</label>
+              <select value={form.town} onChange={(e) => setForm((f) => ({ ...f, town: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20">
+                {TOWNS.map((t) => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">Phone Number</label>
+              <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="+1 902-555-0100" type="tel"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20" />
+            </div>
+
+            {/* Bio */}
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">Short Bio</label>
+              <textarea value={form.bio} onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+                placeholder="Tell neighbours a bit about yourself…" rows={2}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20" />
+            </div>
+
+            <Button onClick={handleSave} disabled={saving || !form.role} className="w-full h-11 rounded-2xl bg-[#F5A623] hover:bg-[#F5A623]/90 text-white font-bold">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : needsOnboarding ? "Get Started →" : "Save Profile"}
+            </Button>
           </div>
-          <div>
-            <p className="text-3xl font-bold text-foreground">{profile.tasksPosted}</p>
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Tasks Posted</p>
-          </div>
-        </Card>
-        
-        <Card className="p-6 rounded-3xl border-border flex items-center gap-4 bg-card hover:border-primary/30 transition-colors">
-          <div className="w-14 h-14 rounded-2xl bg-green-500/10 text-green-500 flex items-center justify-center">
-            <CheckCircle className="w-7 h-7" />
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-foreground">{profile.tasksCompleted}</p>
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Tasks Completed</p>
-          </div>
-        </Card>
-        
-        <Card className="p-6 rounded-3xl border-border flex items-center gap-4 bg-card hover:border-primary/30 transition-colors">
-          <div className="w-14 h-14 rounded-2xl bg-accent/10 text-accent flex items-center justify-center">
-            <Star className="w-7 h-7" />
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-foreground">{profile.rating ? profile.rating.toFixed(1) : 'New'}</p>
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Community Rating</p>
-          </div>
-        </Card>
+        </div>
+      )}
+
+      {/* Reviews */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+        <h3 className="font-bold text-[#1B2A4A] mb-1">
+          Reviews {ratings.length > 0 && <span className="text-gray-400 font-normal text-sm">({ratings.length})</span>}
+        </h3>
+        {profile?.rating && <StarDisplay rating={profile.rating} />}
+        <div className="mt-4 space-y-3">
+          {ratings.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">No reviews yet. Complete a task to earn your first one.</p>
+          ) : (
+            ratings.map((r, i) => (
+              <div key={i} className="bg-gray-50 rounded-xl p-3">
+                <StarDisplay rating={r.rating} />
+                {r.review && <p className="text-sm text-gray-600 mt-1 leading-relaxed">{r.review}</p>}
+                <p className="text-xs text-gray-400 mt-1">{new Date(r.createdAt).toLocaleDateString()}</p>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-[2rem]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">Edit Profile</DialogTitle>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="firstName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name</FormLabel>
-                    <FormControl><Input className="rounded-xl h-12 bg-background" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="lastName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl><Input className="rounded-xl h-12 bg-background" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              <FormField control={form.control} name="phone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl><Input className="rounded-xl h-12 bg-background" placeholder="(555) 555-5555" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-              )} />
-              <FormField control={form.control} name="bio" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>About You</FormLabel>
-                    <FormControl><Textarea className="rounded-xl resize-none min-h-[100px] bg-background" placeholder="Tell your neighbors about yourself and what skills you have..." {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-              )} />
-              <DialogFooter className="pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} className="rounded-xl">Cancel</Button>
-                <Button type="submit" disabled={isPending} className="rounded-xl shadow-md shadow-primary/20">
-                  {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Save Changes
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      {/* Footer links */}
+      <div className="text-center space-y-2 pb-4">
+        <Link href="/guidelines" className="block text-sm text-[#1B2A4A] font-semibold hover:underline">Community Guidelines</Link>
+        {!reportDone ? (
+          <button onClick={() => setReportOpen(true)} className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1 mx-auto">
+            <AlertTriangle className="w-3 h-3" />Report this profile
+          </button>
+        ) : (
+          <p className="text-xs text-gray-400">Report submitted. Thank you.</p>
+        )}
+      </div>
+
+      {reportOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 className="font-bold text-[#1B2A4A] text-lg mb-4">Report Profile</h3>
+            <select value={reportReason} onChange={(e) => setReportReason(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mb-4 bg-white focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20">
+              {["Did not show up","Scam","Harassment","Unsafe task","Other"].map((r) => <option key={r}>{r}</option>)}
+            </select>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setReportOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
+              <Button onClick={handleReport} className="flex-1 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold">Report</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,208 +1,196 @@
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Link, useLocation } from "wouter";
+import { useState } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
-import { useCreateTask } from "@workspace/api-client-react";
-import { Loader2, AlertCircle } from "lucide-react";
-
+import { Loader2, MapPin, Banknote, Smartphone, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
 
-const formSchema = z.object({
-  title: z.string().min(3, "Title must be at least 3 characters").max(100),
-  description: z.string().min(10, "Please provide more details (min 10 chars)"),
-  category: z.string().min(1, "Please select a category"),
-  pay: z.coerce.number().min(1, "Pay must be at least $1"),
-  locationName: z.string().optional(),
-  estimatedHours: z.coerce.number().optional().or(z.literal(0)),
-});
+const CATEGORIES = ["Yard Work", "Cleaning", "Moving Help", "Dog Walking", "Grocery Pickup", "Tech Help", "Small Repairs", "Other"];
+const TOWNS = ["New Glasgow", "Stellarton", "Trenton", "Westville", "Pictou", "River John", "Abercrombie", "Scotsburn"];
+const DURATIONS = [
+  { label: "Under 1 hour", value: 0.5 },
+  { label: "1–2 hours", value: 1.5 },
+  { label: "2–4 hours", value: 3 },
+  { label: "Half day", value: 4 },
+  { label: "Full day", value: 8 },
+];
 
 export default function PostTask() {
-  const { isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  
-  const { mutateAsync: createTask, isPending } = useCreateTask();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      category: "",
-      pay: 0,
-      locationName: "",
-      estimatedHours: undefined,
-    },
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    category: CATEGORIES[0],
+    pay: "",
+    paymentMethod: "cash" as "cash" | "etransfer",
+    estimatedHours: DURATIONS[0].value,
+    town: TOWNS[0],
+    locationName: "",
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    try {
-      const task = await createTask({
-        data: {
-          ...values,
-          // Add default lat/lng for Pictou if map selection isn't implemented
-          lat: 45.6830 + (Math.random() * 0.1 - 0.05),
-          lng: -62.7082 + (Math.random() * 0.1 - 0.05),
-        }
-      });
-      toast({
-        title: "Task posted successfully!",
-        description: "Your neighbors can now see and apply to your task.",
-      });
-      setLocation(`/tasks/${task.id}`);
-    } catch (error: any) {
-      toast({
-        title: "Error posting task",
-        description: error.message || "Please try again later.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="max-w-md mx-auto mt-20 p-8 bg-card rounded-3xl border border-border shadow-sm text-center">
-        <AlertCircle className="w-12 h-12 text-accent mx-auto mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Log In Required</h2>
-        <p className="text-muted-foreground mb-6">You need an account to post tasks to the community.</p>
-        <Link href="/">
-          <Button className="w-full rounded-full">Return Home</Button>
-        </Link>
-      </div>
-    );
+  function set(key: string, value: unknown) {
+    setForm((f) => ({ ...f, [key]: value }));
   }
 
-  const categories = ["Yard Work", "Snow Removal", "Moving Help", "Grocery/Errands", "Pet Care", "Cleaning", "Home Repair", "Tech Help", "Tutoring", "Other"];
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title.trim() || !form.description.trim() || !form.pay) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+    if (Number(form.pay) < 1) {
+      setError("Payment must be at least $1.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          category: form.category,
+          pay: Number(form.pay),
+          paymentMethod: form.paymentMethod,
+          estimatedHours: form.estimatedHours,
+          town: form.town,
+          locationName: form.locationName || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to post task.");
+        return;
+      }
+      const task = await res.json();
+      setLocation(`/tasks/${task.id}`);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 mb-20 md:mb-0">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-extrabold text-foreground tracking-tight">Post a Task</h1>
-        <p className="text-muted-foreground text-lg mt-2">Describe what you need help with and set a fair price.</p>
+    <div className="max-w-xl mx-auto px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-extrabold text-[#1B2A4A]">Post a Task</h1>
+        <p className="text-gray-500 text-sm mt-1">Describe the job and set your price. Locals will see it immediately.</p>
       </div>
 
-      <div className="bg-card p-6 md:p-8 rounded-3xl border border-border shadow-lg shadow-black/5">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-base font-semibold">Task Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Help moving a sofa" className="h-12 bg-background rounded-xl" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Title */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5">Task Title <span className="text-red-500">*</span></label>
+          <input
+            value={form.title}
+            onChange={(e) => set("title", e.target.value)}
+            placeholder="e.g. Mow my front lawn"
+            maxLength={100}
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20"
+          />
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base font-semibold">Category</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-12 bg-background rounded-xl">
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map(cat => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        {/* Description */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5">Description <span className="text-red-500">*</span></label>
+          <textarea
+            value={form.description}
+            onChange={(e) => set("description", e.target.value)}
+            placeholder="Describe what needs to be done, any special requirements…"
+            rows={4}
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 resize-none"
+          />
+        </div>
 
-              <FormField
-                control={form.control}
-                name="pay"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base font-semibold">Pay Amount ($)</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                        <Input type="number" min="1" step="1" className="pl-8 h-12 bg-background rounded-xl" {...field} />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+        {/* Category */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5">Category</label>
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIES.map((cat) => (
+              <button type="button" key={cat} onClick={() => set("category", cat)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${form.category === cat ? "bg-[#1B2A4A] text-white border-[#1B2A4A]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Pay + method */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1.5">Pay Amount <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={form.pay}
+                onChange={(e) => set("pay", e.target.value)}
+                placeholder="25"
+                className="w-full border border-gray-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20"
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-base font-semibold">Details</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Describe exactly what needs to be done, tools required, etc." 
-                      className="min-h-[120px] bg-background rounded-xl resize-none" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="locationName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base font-semibold">Neighborhood / Area (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Stellarton or Westville" className="h-12 bg-background rounded-xl" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="estimatedHours"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base font-semibold">Estimated Hours (Optional)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" step="0.5" placeholder="e.g., 2" className="h-12 bg-background rounded-xl" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1.5">Payment Method</label>
+            <div className="flex gap-2 h-[42px]">
+              <button type="button" onClick={() => set("paymentMethod", "cash")}
+                className={`flex-1 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${form.paymentMethod === "cash" ? "bg-[#1B2A4A] text-white border-[#1B2A4A]" : "bg-white text-gray-600 border-gray-200"}`}>
+                <Banknote className="w-3.5 h-3.5" />Cash
+              </button>
+              <button type="button" onClick={() => set("paymentMethod", "etransfer")}
+                className={`flex-1 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${form.paymentMethod === "etransfer" ? "bg-[#1B2A4A] text-white border-[#1B2A4A]" : "bg-white text-gray-600 border-gray-200"}`}>
+                <Smartphone className="w-3.5 h-3.5" />eTransfer
+              </button>
             </div>
+          </div>
+        </div>
 
-            <Button type="submit" disabled={isPending} className="w-full h-14 text-lg rounded-xl font-bold shadow-xl shadow-primary/20 hover:shadow-2xl hover:shadow-primary/30 transition-all">
-              {isPending ? (
-                <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Posting Task...</>
-              ) : "Post Task to Community"}
-            </Button>
-          </form>
-        </Form>
-      </div>
+        {/* Duration */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5"><Clock className="inline w-3.5 h-3.5 mr-1" />Estimated Duration</label>
+          <select value={form.estimatedHours} onChange={(e) => set("estimatedHours", Number(e.target.value))}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20">
+            {DURATIONS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+          </select>
+        </div>
+
+        {/* Town */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5"><MapPin className="inline w-3.5 h-3.5 mr-1" />Town</label>
+          <select value={form.town} onChange={(e) => set("town", e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20">
+            {TOWNS.map((t) => <option key={t}>{t}</option>)}
+          </select>
+        </div>
+
+        {/* Location note */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5">Street / Location Note <span className="text-gray-400 font-normal">(optional)</span></label>
+          <input
+            value={form.locationName}
+            onChange={(e) => set("locationName", e.target.value)}
+            placeholder="e.g. 123 Main St or near the park"
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20"
+          />
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>
+        )}
+
+        <Button type="submit" disabled={loading} className="w-full h-12 rounded-2xl bg-[#F5A623] hover:bg-[#F5A623]/90 text-white font-bold text-base shadow-lg shadow-[#F5A623]/20">
+          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Post Task"}
+        </Button>
+      </form>
     </div>
   );
 }

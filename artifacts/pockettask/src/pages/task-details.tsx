@@ -1,294 +1,381 @@
 import { useParams, Link } from "wouter";
-import { format } from "date-fns";
 import { useAuth } from "@workspace/replit-auth-web";
-import { useQueryClient } from "@tanstack/react-query";
-import { 
-  useGetTask, 
-  useGetTaskApplications, 
-  useApplyToTask, 
-  useUpdateApplication,
-  getGetTaskQueryKey,
-  getGetTaskApplicationsQueryKey
-} from "@workspace/api-client-react";
-import { MapPin, Clock, DollarSign, User, CheckCircle, XCircle, Loader2 } from "lucide-react";
-import { useState } from "react";
-
+import { useGetTask } from "@workspace/api-client-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2, MapPin, Clock, Banknote, Smartphone, Star, AlertTriangle, Send, CheckCircle2, AlertCircle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+
+type Message = { id: number; senderId: string; content: string; createdAt: string; sender: { id: string; username: string; profileImage?: string | null; firstName?: string | null } };
+type Toast = { message: string; type: "success" | "error" };
+
+function StarRating({ value, onChange }: { value: number; onChange?: (v: number) => void }) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div className="flex gap-1">
+      {[1,2,3,4,5].map((i) => (
+        <Star key={i}
+          className={`w-7 h-7 cursor-pointer transition-colors ${(hover || value) >= i ? "fill-[#F5A623] text-[#F5A623]" : "text-gray-300"}`}
+          onMouseEnter={() => onChange && setHover(i)}
+          onMouseLeave={() => onChange && setHover(0)}
+          onClick={() => onChange?.(i)}
+        />
+      ))}
+    </div>
+  );
+}
+
+const REPORT_REASONS = ["Did not show up", "Scam", "Harassment", "Unsafe task", "Other"];
 
 export default function TaskDetails() {
-  const { id } = useParams();
-  const taskId = parseInt(id || "0", 10);
-  const { user, isAuthenticated } = useAuth();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const { id } = useParams<{ id: string }>();
+  const { user, isAuthenticated, login } = useAuth();
+  const taskId = parseInt(id);
+  const { data: task, isLoading, refetch } = useGetTask(taskId);
 
-  const { data: task, isLoading: isLoadingTask, error } = useGetTask(taskId);
-  const { data: appsData, isLoading: isLoadingApps } = useGetTaskApplications(taskId, {
-    query: { enabled: !!task && user?.id === task.postedById }
-  });
+  const [toast, setToast] = useState<Toast | null>(null);
+  const [claiming, setClaiming] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [msgInput, setMsgInput] = useState("");
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [ratingVal, setRatingVal] = useState(0);
+  const [review, setReview] = useState("");
+  const [ratingDone, setRatingDone] = useState(false);
+  const [submittingRating, setSubmittingRating] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState(REPORT_REASONS[0]);
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportDone, setReportDone] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { mutateAsync: applyToTask, isPending: isApplying } = useApplyToTask();
-  const { mutateAsync: updateApplication, isPending: isUpdating } = useUpdateApplication();
-
-  const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
-  const [applyMessage, setApplyMessage] = useState("");
-
-  if (isLoadingTask) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>;
+  function showToast(message: string, type: Toast["type"] = "success") {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
   }
 
-  if (error || !task) {
-    return (
-      <div className="max-w-md mx-auto mt-20 text-center space-y-4">
-        <h2 className="text-2xl font-bold">Task Not Found</h2>
-        <p className="text-muted-foreground">This task may have been deleted or doesn't exist.</p>
-        <Link href="/dashboard"><Button>Back to Dashboard</Button></Link>
-      </div>
-    );
+  // Fetch messages for claimed tasks
+  const canChat = task && (task.postedById === user?.id || task.claimedById === user?.id) && (task.status === "claimed" || task.status === "in_progress" || task.status === "completed");
+
+  async function fetchMessages() {
+    if (!canChat || !isAuthenticated) return;
+    try {
+      const res = await fetch(`/api/messages/${taskId}`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.messages ?? []);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      }
+    } catch {}
+  }
+
+  useEffect(() => {
+    if (canChat) {
+      fetchMessages();
+      pollRef.current = setInterval(fetchMessages, 5000);
+    }
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [canChat, isAuthenticated]);
+
+  async function handleClaim() {
+    setClaiming(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/claim`, { method: "POST", credentials: "include" });
+      if (res.status === 409) {
+        showToast("This task has already been taken.", "error");
+      } else if (res.ok) {
+        showToast("You claimed this task! Chat with the task giver below.", "success");
+        refetch();
+      } else {
+        const d = await res.json();
+        showToast(d.error ?? "Failed to claim task.", "error");
+      }
+    } finally {
+      setClaiming(false);
+    }
+  }
+
+  async function handleComplete() {
+    setCompleting(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/complete`, { method: "POST", credentials: "include" });
+      if (res.ok) {
+        showToast("Task marked as completed!", "success");
+        refetch();
+      }
+    } finally {
+      setCompleting(false);
+    }
+  }
+
+  async function handleSendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    if (!msgInput.trim()) return;
+    setSendingMsg(true);
+    try {
+      const res = await fetch(`/api/messages/${taskId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content: msgInput.trim() }),
+      });
+      if (res.ok) {
+        setMsgInput("");
+        fetchMessages();
+      }
+    } finally {
+      setSendingMsg(false);
+    }
+  }
+
+  async function handleRating() {
+    if (!ratingVal || !task) return;
+    const ratedId = task.postedById === user?.id ? task.claimedById : task.postedById;
+    if (!ratedId) return;
+    setSubmittingRating(true);
+    try {
+      const res = await fetch("/api/ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ taskId, ratedId, rating: ratingVal, review: review || null }),
+      });
+      if (res.ok) {
+        setRatingDone(true);
+        showToast("Rating submitted. Thanks!", "success");
+      }
+    } finally {
+      setSubmittingRating(false);
+    }
+  }
+
+  async function handleReport() {
+    const res = await fetch("/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ targetType: "task", targetId: String(taskId), reason: reportReason, details: reportDetails || null }),
+    });
+    if (res.ok) {
+      setReportDone(true);
+      setReportOpen(false);
+      showToast("Report submitted. Thank you.", "success");
+    }
+  }
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B2A4A]" /></div>;
+  }
+  if (!task) {
+    return <div className="text-center py-20"><p className="text-gray-500">Task not found.</p><Link href="/dashboard"><Button className="mt-4 rounded-2xl">Back to Dashboard</Button></Link></div>;
   }
 
   const isOwner = user?.id === task.postedById;
-  const isAssignedToMe = user?.id === task.assignedToId;
-
-  const handleApply = async () => {
-    try {
-      await applyToTask({ id: taskId, data: { message: applyMessage } });
-      toast({ title: "Application sent!", description: "The task poster has been notified." });
-      setIsApplyModalOpen(false);
-    } catch (e: any) {
-      toast({ title: "Failed to apply", description: e.message, variant: "destructive" });
-    }
-  };
-
-  const handleUpdateApp = async (appId: number, status: "accepted" | "rejected") => {
-    try {
-      await updateApplication({ id: appId, data: { status } });
-      toast({ title: `Application ${status}` });
-      queryClient.invalidateQueries({ queryKey: getGetTaskApplicationsQueryKey(taskId) });
-      queryClient.invalidateQueries({ queryKey: getGetTaskQueryKey(taskId) });
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
-    }
-  };
+  const isClaimer = user?.id === (task as any).claimedById;
+  const isOpen = task.status === "open";
+  const isClaimed = task.status === "claimed" || task.status === "in_progress";
+  const isCompleted = task.status === "completed";
+  const canClaim = isAuthenticated && !isOwner && isOpen;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 md:py-12 mb-20 md:mb-0">
-      <Link href="/dashboard" className="text-primary font-medium hover:underline mb-6 inline-block">
-        &larr; Back to Dashboard
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white flex items-center gap-2 ${toast.type === "success" ? "bg-green-600" : "bg-red-500"}`}>
+          {toast.type === "success" ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {toast.message}
+        </div>
+      )}
+
+      {/* Back */}
+      <Link href="/dashboard" className="flex items-center gap-1 text-sm text-gray-500 hover:text-[#1B2A4A] font-medium">
+        <ArrowLeft className="w-4 h-4" />Back to Dashboard
       </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          {/* Main Task Info */}
-          <div className="bg-card p-6 md:p-10 rounded-3xl border border-border shadow-lg shadow-black/5">
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-              <Badge variant="outline" className="px-3 py-1 text-sm bg-secondary/50 border-border">
-                {task.category}
-              </Badge>
-              <Badge className={`px-3 py-1 text-sm capitalize ${task.status === 'open' ? 'bg-green-500 hover:bg-green-600' : ''}`}>
-                {task.status.replace('_', ' ')}
-              </Badge>
+      {/* Task card */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <span className="text-xs font-bold text-[#F5A623] uppercase tracking-wider">{task.category}</span>
+          {task.status === "open" && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Open</span>}
+          {isClaimed && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">In Progress</span>}
+          {isCompleted && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Completed</span>}
+        </div>
+        <h1 className="text-2xl font-extrabold text-[#1B2A4A] mb-3">{task.title}</h1>
+        <p className="text-gray-600 text-sm leading-relaxed mb-5">{task.description}</p>
+
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="bg-gray-50 rounded-xl p-3">
+            <p className="text-xs text-gray-400 font-semibold mb-0.5">Pay</p>
+            <p className="text-2xl font-extrabold text-green-600">${task.pay}</p>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3">
+            <p className="text-xs text-gray-400 font-semibold mb-0.5">Payment</p>
+            <p className="text-sm font-bold text-[#1B2A4A] flex items-center gap-1.5">
+              {task.paymentMethod === "etransfer" ? <><Smartphone className="w-4 h-4" />eTransfer</> : <><Banknote className="w-4 h-4" />Cash</>}
+            </p>
+          </div>
+          {task.town && (
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-400 font-semibold mb-0.5">Location</p>
+              <p className="text-sm font-bold text-[#1B2A4A] flex items-center gap-1"><MapPin className="w-4 h-4" />{task.town}</p>
             </div>
-
-            <h1 className="text-3xl md:text-4xl font-extrabold text-foreground tracking-tight mb-4">
-              {task.title}
-            </h1>
-
-            <div className="flex flex-wrap gap-6 text-muted-foreground mb-8 pb-8 border-b border-border/60">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <DollarSign className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider">Pay</p>
-                  <p className="font-bold text-foreground text-lg">${task.pay.toFixed(2)}</p>
-                </div>
-              </div>
-              
-              {task.estimatedHours && (
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground">
-                    <Clock className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider">Time</p>
-                    <p className="font-bold text-foreground text-lg">{task.estimatedHours} hrs</p>
-                  </div>
-                </div>
-              )}
-              
-              {task.locationName && (
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-                    <MapPin className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider">Location</p>
-                    <p className="font-bold text-foreground text-lg">{task.locationName}</p>
-                  </div>
-                </div>
-              )}
+          )}
+          {task.estimatedHours && (
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-400 font-semibold mb-0.5">Duration</p>
+              <p className="text-sm font-bold text-[#1B2A4A] flex items-center gap-1"><Clock className="w-4 h-4" />{task.estimatedHours}h</p>
             </div>
+          )}
+        </div>
 
-            <div className="prose prose-slate dark:prose-invert max-w-none">
-              <h3 className="text-xl font-bold mb-4">Details</h3>
-              <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed text-lg">
-                {task.description}
+        {/* Posted by */}
+        {(task as any).postedBy && (
+          <div className="flex items-center gap-3 border-t border-gray-100 pt-4">
+            <Avatar className="w-9 h-9">
+              <AvatarImage src={(task as any).postedBy.profileImage ?? undefined} />
+              <AvatarFallback className="bg-[#1B2A4A]/10 text-[#1B2A4A] text-xs font-bold">
+                {((task as any).postedBy.firstName?.[0] ?? (task as any).postedBy.username?.[0] ?? "?").toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-xs text-gray-400">Posted by</p>
+              <p className="text-sm font-bold text-[#1B2A4A]">
+                {(task as any).postedBy.firstName ? `${(task as any).postedBy.firstName} ${(task as any).postedBy.lastName ?? ""}`.trim() : (task as any).postedBy.username}
               </p>
             </div>
-            
-            <div className="mt-8 text-sm text-muted-foreground flex items-center gap-2">
-              <Clock className="w-4 h-4" /> Posted on {format(new Date(task.createdAt), "MMMM d, yyyy 'at' h:mm a")}
-            </div>
           </div>
-
-          {/* Owner Applications View */}
-          {isOwner && task.status === 'open' && (
-            <div className="bg-card p-6 md:p-8 rounded-3xl border border-border shadow-sm">
-              <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                Applications <Badge variant="secondary" className="ml-2">{task.applicationCount}</Badge>
-              </h3>
-              
-              {isLoadingApps ? (
-                <div className="space-y-4">
-                  {[1,2].map(i => <div key={i} className="h-24 bg-secondary/50 rounded-xl animate-pulse" />)}
-                </div>
-              ) : appsData?.applications.length ? (
-                <div className="space-y-4">
-                  {appsData.applications.map(app => (
-                    <Card key={app.id} className="p-4 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-                      <div className="flex gap-4 items-start">
-                        <Avatar className="w-12 h-12 border border-border">
-                          <AvatarImage src={app.applicant.profileImage || undefined} />
-                          <AvatarFallback>{app.applicant.username.substring(0,2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-bold text-foreground">{app.applicant.firstName} {app.applicant.lastName || app.applicant.username}</p>
-                          {app.message && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">"{app.message}"</p>}
-                          <p className="text-xs text-muted-foreground mt-2">{format(new Date(app.createdAt), 'MMM d, yyyy')}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <Button 
-                          variant="outline" 
-                          className="w-full sm:w-auto text-destructive hover:bg-destructive/10 border-destructive/20"
-                          onClick={() => handleUpdateApp(app.id, 'rejected')}
-                          disabled={isUpdating}
-                        >
-                          <XCircle className="w-4 h-4 mr-1" /> Reject
-                        </Button>
-                        <Button 
-                          className="w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white"
-                          onClick={() => handleUpdateApp(app.id, 'accepted')}
-                          disabled={isUpdating}
-                        >
-                          <CheckCircle className="w-4 h-4 mr-1" /> Accept
-                        </Button>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-center py-8">No one has applied yet. Check back soon!</p>
-              )}
-            </div>
-          )}
-
-          {/* Assigned Information */}
-          {task.status !== 'open' && task.assignedTo && (
-            <div className="bg-primary/5 border border-primary/20 p-6 rounded-3xl flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-full text-primary">
-                <CheckCircle className="w-8 h-8" />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg text-foreground">Task {task.status.replace('_', ' ')}</h3>
-                <p className="text-muted-foreground">Assigned to <span className="font-semibold text-foreground">{task.assignedTo.firstName || task.assignedTo.username}</span></p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar Info */}
-        <div className="space-y-6">
-          <div className="bg-card p-6 rounded-3xl border border-border shadow-sm sticky top-24">
-            <h3 className="font-bold text-lg mb-4 text-foreground">Posted By</h3>
-            <div className="flex items-center gap-4 mb-6">
-              <Avatar className="w-16 h-16 border-2 border-primary/20">
-                <AvatarImage src={task.postedBy.profileImage || undefined} />
-                <AvatarFallback className="text-lg bg-primary/10 text-primary">{task.postedBy.username.substring(0,2).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-bold text-lg text-foreground leading-tight">
-                  {task.postedBy.firstName ? `${task.postedBy.firstName} ${task.postedBy.lastName || ''}` : task.postedBy.username}
-                </p>
-                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                  <User className="w-3 h-3" /> Neighbor
-                </p>
-              </div>
-            </div>
-
-            {!isOwner && task.status === 'open' && (
-              <>
-                {isAuthenticated ? (
-                  <Button 
-                    className="w-full h-14 rounded-xl text-lg font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all hover:-translate-y-0.5" 
-                    onClick={() => setIsApplyModalOpen(true)}
-                  >
-                    Apply for this Task
-                  </Button>
-                ) : (
-                  <div className="text-center p-4 bg-secondary/50 rounded-xl border border-border">
-                    <p className="text-sm text-muted-foreground mb-3">Log in to offer your help.</p>
-                    <Link href="/">
-                      <Button variant="outline" className="w-full">Go to Login</Button>
-                    </Link>
-                  </div>
-                )}
-              </>
-            )}
-
-            {isAssignedToMe && (
-              <div className="mt-4 p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-center">
-                <p className="text-green-700 dark:text-green-400 font-bold">You are assigned to this task!</p>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
-      <Dialog open={isApplyModalOpen} onOpenChange={setIsApplyModalOpen}>
-        <DialogContent className="sm:max-w-[425px] rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">Offer to Help</DialogTitle>
-            <DialogDescription className="text-base">
-              Let the poster know you're interested in doing this task.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <label className="text-sm font-semibold mb-2 block">Message (Optional)</label>
-            <Textarea 
-              placeholder="Hi, I live nearby and can help you with this today..."
-              className="resize-none h-32 rounded-xl"
-              value={applyMessage}
-              onChange={(e) => setApplyMessage(e.target.value)}
-            />
+      {/* Claim action */}
+      {!isAuthenticated && isOpen && (
+        <div className="bg-[#1B2A4A] text-white rounded-2xl p-5 text-center">
+          <p className="font-semibold mb-3">Log in to claim this task</p>
+          <Button onClick={login} className="bg-[#F5A623] hover:bg-[#F5A623]/90 rounded-xl font-bold">Log in / Sign up</Button>
+        </div>
+      )}
+
+      {canClaim && (
+        <div className="bg-[#1B2A4A] rounded-2xl p-5 text-center text-white">
+          <h3 className="font-bold text-lg mb-1">Ready to get to work?</h3>
+          <p className="text-sm text-white/70 mb-4">First to claim gets the job. Be fast!</p>
+          <Button onClick={handleClaim} disabled={claiming} className="bg-[#F5A623] hover:bg-[#F5A623]/90 text-white rounded-xl font-bold px-8 h-11">
+            {claiming ? <Loader2 className="w-4 h-4 animate-spin" /> : "Claim This Task →"}
+          </Button>
+        </div>
+      )}
+
+      {!isOpen && !isClaimed && !isCompleted && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
+          <p className="text-red-600 font-semibold">This task has already been taken.</p>
+        </div>
+      )}
+
+      {/* Complete button (owner, after claimed) */}
+      {isOwner && isClaimed && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="font-semibold text-green-800 text-sm">Task in progress</p>
+            <p className="text-green-600 text-xs">Mark complete when the work is done.</p>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsApplyModalOpen(false)} className="rounded-xl">Cancel</Button>
-            <Button onClick={handleApply} disabled={isApplying} className="rounded-xl font-bold shadow-md shadow-primary/20">
-              {isApplying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Send Application
+          <Button onClick={handleComplete} disabled={completing} className="rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold shrink-0">
+            {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : "Mark Complete"}
+          </Button>
+        </div>
+      )}
+
+      {/* Chat section */}
+      {canChat && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 bg-[#1B2A4A]/5">
+            <h3 className="font-bold text-[#1B2A4A] text-sm">Chat</h3>
+            <p className="text-xs text-gray-500">Private conversation for this task</p>
+          </div>
+          <div className="h-60 overflow-y-auto p-4 space-y-3 bg-gray-50">
+            {messages.length === 0 && (
+              <p className="text-center text-xs text-gray-400 py-8">No messages yet. Say hello!</p>
+            )}
+            {messages.map((msg) => {
+              const isMe = msg.senderId === user?.id;
+              const name = msg.sender.firstName ?? msg.sender.username;
+              return (
+                <div key={msg.id} className={`flex flex-col gap-0.5 ${isMe ? "items-end" : "items-start"}`}>
+                  <span className="text-[10px] text-gray-400 px-1">{name}</span>
+                  <div className={`max-w-[75%] px-3.5 py-2 rounded-2xl text-sm font-medium leading-snug ${isMe ? "bg-[#1B2A4A] text-white rounded-br-sm" : "bg-white border border-gray-200 text-gray-800 rounded-bl-sm shadow-sm"}`}>
+                    {msg.content}
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+          <form onSubmit={handleSendMessage} className="flex gap-2 p-3 border-t border-gray-100 bg-white">
+            <input
+              value={msgInput}
+              onChange={(e) => setMsgInput(e.target.value)}
+              placeholder="Type a message…"
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20"
+            />
+            <Button type="submit" size="sm" disabled={sendingMsg || !msgInput.trim()} className="rounded-xl bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 px-3">
+              {sendingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </form>
+        </div>
+      )}
+
+      {/* Rating section */}
+      {isCompleted && isAuthenticated && !ratingDone && (task.postedById === user?.id || (task as any).claimedById === user?.id) && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+          <h3 className="font-bold text-[#1B2A4A] mb-1">Rate your experience</h3>
+          <p className="text-sm text-gray-500 mb-4">Help build trust in the community.</p>
+          <StarRating value={ratingVal} onChange={setRatingVal} />
+          <textarea
+            value={review}
+            onChange={(e) => setReview(e.target.value)}
+            placeholder="Write a short review (optional)…"
+            rows={2}
+            className="w-full mt-3 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 resize-none"
+          />
+          <Button onClick={handleRating} disabled={!ratingVal || submittingRating} className="mt-3 rounded-xl bg-[#F5A623] hover:bg-[#F5A623]/90 text-white font-bold w-full">
+            {submittingRating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit Rating"}
+          </Button>
+        </div>
+      )}
+      {ratingDone && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center text-green-700 font-semibold text-sm">
+          ⭐ Rating submitted — thanks for keeping PocketTask trustworthy!
+        </div>
+      )}
+
+      {/* Report */}
+      {isAuthenticated && !isOwner && (
+        <div className="flex justify-end">
+          <button onClick={() => setReportOpen(true)} className="text-xs text-gray-400 hover:text-red-500 underline flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />Report this task
+          </button>
+        </div>
+      )}
+
+      {reportOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 className="font-bold text-[#1B2A4A] text-lg mb-1">Report Task</h3>
+            <p className="text-xs text-gray-500 mb-4">Help us keep PocketTask safe.</p>
+            <select value={reportReason} onChange={(e) => setReportReason(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 bg-white">
+              {REPORT_REASONS.map((r) => <option key={r}>{r}</option>)}
+            </select>
+            <textarea value={reportDetails} onChange={(e) => setReportDetails(e.target.value)}
+              placeholder="Additional details (optional)…" rows={2}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 resize-none" />
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setReportOpen(false)} className="flex-1 rounded-xl">Cancel</Button>
+              <Button onClick={handleReport} className="flex-1 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold">Submit Report</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

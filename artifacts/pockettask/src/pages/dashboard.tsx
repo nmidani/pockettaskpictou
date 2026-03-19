@@ -1,167 +1,275 @@
 import { useState } from "react";
-import { Link } from "wouter";
-import { PlusCircle, Search, Filter } from "lucide-react";
-import { useGetTasks, useGetMyPostedTasks, useGetMyApplications } from "@workspace/api-client-react";
-import { TaskCard } from "@/components/task-card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useGetTasks, useGetMyPostedTasks, useGetMyApplications } from "@workspace/api-client-react";
+import { Task } from "@workspace/api-client-react";
+import { PlusCircle, MapPin, Clock, Banknote, Smartphone, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-export default function Dashboard() {
-  const { isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState("browse");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+const CATEGORIES = ["All", "Yard Work", "Cleaning", "Moving Help", "Dog Walking", "Grocery Pickup", "Tech Help", "Small Repairs", "Other"];
+const TOWNS = ["All Towns", "New Glasgow", "Stellarton", "Trenton", "Westville", "Pictou", "River John", "Abercrombie", "Scotsburn"];
 
-  const { data: allTasksData, isLoading: isLoadingAll } = useGetTasks({ status: 'open' });
-  const { data: myTasksData, isLoading: isLoadingMyTasks } = useGetMyPostedTasks(undefined, { 
-    query: { enabled: isAuthenticated && activeTab === 'activity' } 
-  });
-  const { data: myAppsData, isLoading: isLoadingMyApps } = useGetMyApplications(undefined, {
-    query: { enabled: isAuthenticated && activeTab === 'activity' }
-  });
+type Toast = { id: number; message: string; type: "success" | "error" };
 
-  const categories = ["all", "Yard Work", "Snow Removal", "Moving Help", "Grocery/Errands", "Pet Care", "Cleaning", "Home Repair", "Tech Help", "Tutoring", "Other"];
+function useToast() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  function show(message: string, type: Toast["type"] = "success") {
+    const id = Date.now();
+    setToasts((t) => [...t, { id, message, type }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
+  }
+  return { toasts, show };
+}
 
-  const filteredTasks = allTasksData?.tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          task.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === "all" || task.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  }) || [];
+function statusBadge(status: string) {
+  if (status === "open") return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Open</span>;
+  if (status === "claimed") return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Taken</span>;
+  if (status === "completed") return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Completed</span>;
+  return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">{status}</span>;
+}
+
+function TaskCard({ task, userId, onClaimed }: { task: Task; userId?: string; onClaimed: (id: number) => void }) {
+  const [claiming, setClaiming] = useState(false);
+  const isOwn = task.postedById === userId;
+  const canClaim = task.status === "open" && !isOwn && !!userId;
+
+  async function handleClaim() {
+    setClaiming(true);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/claim`, { method: "POST", credentials: "include" });
+      if (res.status === 409) {
+        onClaimed(-task.id); // negative = error
+      } else if (res.ok) {
+        onClaimed(task.id);
+      }
+    } finally {
+      setClaiming(false);
+    }
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-foreground tracking-tight mb-2">Dashboard</h1>
-          <p className="text-muted-foreground text-lg">Find tasks to do or manage your posted requests.</p>
-        </div>
-        
-        {isAuthenticated && (
-          <Link href="/post-task">
-            <Button size="lg" className="rounded-full shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-transform w-full md:w-auto">
-              <PlusCircle className="w-5 h-5 mr-2" />
-              Post a New Task
-            </Button>
+    <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="text-xs font-bold text-[#F5A623] uppercase tracking-wider">{task.category}</span>
+            {statusBadge(task.status)}
+          </div>
+          <Link href={`/tasks/${task.id}`}>
+            <h3 className="font-bold text-[#1B2A4A] text-base leading-snug hover:underline cursor-pointer line-clamp-1">{task.title}</h3>
           </Link>
+        </div>
+        <div className="text-right shrink-0">
+          <span className="text-xl font-extrabold text-green-600">${task.pay}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 text-xs text-gray-500 mb-3 flex-wrap">
+        {task.town && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{task.town}</span>}
+        {task.estimatedHours && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{task.estimatedHours}h</span>}
+        <span className="flex items-center gap-1">
+          {task.paymentMethod === "etransfer" ? <Smartphone className="w-3 h-3" /> : <Banknote className="w-3 h-3" />}
+          {task.paymentMethod === "etransfer" ? "eTransfer" : "Cash"}
+        </span>
+      </div>
+      <div className="flex gap-2">
+        <Link href={`/tasks/${task.id}`} className="flex-1">
+          <Button variant="outline" size="sm" className="w-full rounded-xl text-xs font-semibold">View Details</Button>
+        </Link>
+        {canClaim && (
+          <Button size="sm" onClick={handleClaim} disabled={claiming}
+            className="flex-1 rounded-xl text-xs font-bold bg-[#F5A623] hover:bg-[#F5A623]/90 text-white">
+            {claiming ? <Loader2 className="w-3 h-3 animate-spin" /> : "Claim Task"}
+          </Button>
+        )}
+        {isOwn && (
+          <span className="flex items-center text-xs text-gray-400 px-2">Your task</span>
         )}
       </div>
+    </div>
+  );
+}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-        <div className="flex justify-center md:justify-start">
-          <TabsList className="grid grid-cols-2 w-full md:w-[400px] h-12 rounded-full p-1 bg-secondary/50 backdrop-blur">
-            <TabsTrigger value="browse" className="rounded-full font-semibold">Browse Tasks</TabsTrigger>
-            <TabsTrigger value="activity" disabled={!isAuthenticated} className="rounded-full font-semibold">My Activity</TabsTrigger>
-          </TabsList>
+export default function Dashboard() {
+  const { user, isAuthenticated, login } = useAuth();
+  const [, setLocation] = useLocation();
+  const [tab, setTab] = useState<"browse" | "activity">("browse");
+  const [category, setCategory] = useState("All");
+  const [town, setTown] = useState("All Towns");
+  const { toasts, show: showToast } = useToast();
+  const [claimedIds, setClaimedIds] = useState<Set<number>>(new Set());
+
+  const { data: tasksData, isLoading, refetch } = useGetTasks({
+    ...(category !== "All" ? { category } : {}),
+    ...(town !== "All Towns" ? { town } : {}),
+  });
+
+  const { data: myTasksData } = useGetMyPostedTasks();
+  const { data: myAppsData } = useGetMyApplications();
+
+  function handleClaimed(id: number) {
+    if (id < 0) {
+      showToast("This task has already been taken.", "error");
+    } else {
+      showToast("Task claimed! Head to the task page to chat.", "success");
+      setClaimedIds((s) => new Set([...s, id]));
+      refetch();
+      setTimeout(() => setLocation(`/tasks/${id}`), 1200);
+    }
+  }
+
+  const tasks = tasksData?.tasks ?? [];
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-6">
+      {/* Toasts */}
+      <div className="fixed top-20 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+        {toasts.map((t) => (
+          <div key={t.id} className={`px-4 py-3 rounded-2xl shadow-lg text-sm font-semibold text-white flex items-center gap-2 pointer-events-none animate-in slide-in-from-right ${t.type === "success" ? "bg-green-600" : "bg-red-500"}`}>
+            {t.type === "success" ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+            {t.message}
+          </div>
+        ))}
+      </div>
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-extrabold text-[#1B2A4A]">
+            {user?.firstName ? `Hi, ${user.firstName}!` : "Dashboard"}
+          </h1>
+          <p className="text-gray-500 text-sm mt-0.5">Find work or manage your tasks.</p>
         </div>
+        <Link href="/post-task">
+          <Button className="rounded-2xl bg-[#F5A623] hover:bg-[#F5A623]/90 text-white font-bold shadow-md shadow-[#F5A623]/20 gap-1.5">
+            <PlusCircle className="w-4 h-4" />Post Task
+          </Button>
+        </Link>
+      </div>
 
-        <TabsContent value="browse" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex flex-col sm:flex-row gap-4 bg-card p-4 rounded-2xl border border-border shadow-sm">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input 
-                placeholder="Search tasks..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-12 bg-background border-input rounded-xl"
-              />
-            </div>
-            <div className="w-full sm:w-[220px]">
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="h-12 rounded-xl border-input bg-background">
-                  <div className="flex items-center gap-2">
-                    <Filter className="w-4 h-4 text-muted-foreground" />
-                    <SelectValue placeholder="All Categories" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(cat => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat === "all" ? "All Categories" : cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-5">
+        {(["browse", "activity"] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${tab === t ? "bg-white text-[#1B2A4A] shadow-sm" : "text-gray-500"}`}>
+            {t === "browse" ? "Browse Tasks" : "My Activity"}
+          </button>
+        ))}
+      </div>
+
+      {/* Browse Tasks */}
+      {tab === "browse" && (
+        <>
+          {/* Category scroll */}
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-3 scrollbar-hide snap-x">
+            {CATEGORIES.map((cat) => (
+              <button key={cat} onClick={() => setCategory(cat)} className={`shrink-0 snap-start px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${category === cat ? "bg-[#1B2A4A] text-white border-[#1B2A4A]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
+                {cat}
+              </button>
+            ))}
+          </div>
+          {/* Town filter */}
+          <div className="mb-4">
+            <select value={town} onChange={(e) => setTown(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20">
+              {TOWNS.map((t) => <option key={t}>{t}</option>)}
+            </select>
           </div>
 
-          {isLoadingAll ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1,2,3,4,5,6].map(i => (
-                <div key={i} className="h-64 rounded-2xl bg-secondary/50 animate-pulse border border-border/50" />
-              ))}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-[#1B2A4A]" />
             </div>
-          ) : filteredTasks.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTasks.map(task => (
-                <TaskCard key={task.id} task={task} />
-              ))}
+          ) : tasks.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
+              <div className="text-4xl mb-3">🔍</div>
+              <h3 className="font-bold text-[#1B2A4A] mb-1">No tasks found</h3>
+              <p className="text-gray-500 text-sm">Be the first to post a task in this area.</p>
+              <Link href="/post-task"><Button className="mt-4 rounded-2xl bg-[#1B2A4A]">Post a Task</Button></Link>
             </div>
           ) : (
-            <div className="text-center py-24 bg-card rounded-3xl border border-border/50 shadow-sm">
-              <img src={`${import.meta.env.BASE_URL}images/empty-state.png`} alt="No tasks" className="w-48 h-48 mx-auto opacity-70 mb-6" />
-              <h3 className="text-2xl font-bold text-foreground mb-2">No tasks found</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                We couldn't find any open tasks matching your search. Try adjusting your filters or check back later!
-              </p>
+            <div className="grid gap-3">
+              {tasks.map((task) => (
+                <TaskCard key={task.id} task={task} userId={user?.id} onClaimed={handleClaimed} />
+              ))}
             </div>
           )}
-        </TabsContent>
+        </>
+      )}
 
-        <TabsContent value="activity" className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Posted Tasks Section */}
-          <section>
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-              <div className="w-2 h-8 bg-primary rounded-full" /> Tasks You Posted
-            </h2>
-            {isLoadingMyTasks ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1,2].map(i => <div key={i} className="h-64 rounded-2xl bg-secondary/50 animate-pulse" />)}
+      {/* My Activity */}
+      {tab === "activity" && (
+        <div className="space-y-5">
+          {!isAuthenticated && (
+            <div className="text-center py-12 bg-white rounded-2xl border border-gray-200">
+              <p className="text-gray-500 mb-4">Log in to see your activity.</p>
+              <Button onClick={login} className="rounded-2xl bg-[#1B2A4A]">Log in</Button>
+            </div>
+          )}
+          {isAuthenticated && (
+            <>
+              <div>
+                <h3 className="font-bold text-[#1B2A4A] mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-[#1B2A4A]/10 flex items-center justify-center text-[#1B2A4A] text-xs font-bold">{myTasksData?.tasks.length ?? 0}</span>
+                  My Posted Tasks
+                </h3>
+                {myTasksData?.tasks.length === 0 ? (
+                  <div className="text-sm text-gray-500 bg-gray-50 rounded-xl p-4 text-center">
+                    No tasks posted yet. <Link href="/post-task" className="text-[#1B2A4A] font-semibold underline">Post one now →</Link>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {myTasksData?.tasks.map((task) => (
+                      <Link key={task.id} href={`/tasks/${task.id}`}>
+                        <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between hover:shadow-sm transition-shadow">
+                          <div>
+                            <p className="font-semibold text-[#1B2A4A] text-sm">{task.title}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{task.town ?? task.category}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-green-600">${task.pay}</span>
+                            {statusBadge(task.status)}
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : myTasksData?.tasks.length ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {myTasksData.tasks.map(task => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 text-center bg-secondary/30 rounded-2xl border border-border border-dashed">
-                <p className="text-muted-foreground">You haven't posted any tasks yet.</p>
-                <Link href="/post-task">
-                  <Button variant="link" className="mt-2 text-primary">Post your first task</Button>
-                </Link>
-              </div>
-            )}
-          </section>
 
-          {/* Applications Section */}
-          <section>
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-              <div className="w-2 h-8 bg-accent rounded-full" /> Tasks You Applied For
-            </h2>
-            {isLoadingMyApps ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1,2].map(i => <div key={i} className="h-64 rounded-2xl bg-secondary/50 animate-pulse" />)}
+              <div>
+                <h3 className="font-bold text-[#1B2A4A] mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-[#F5A623]/10 flex items-center justify-center text-[#F5A623] text-xs font-bold">{myAppsData?.applications.length ?? 0}</span>
+                  My Applications
+                </h3>
+                {myAppsData?.applications.length === 0 ? (
+                  <div className="text-sm text-gray-500 bg-gray-50 rounded-xl p-4 text-center">
+                    No applications yet. <Link href="/dashboard" className="text-[#1B2A4A] font-semibold underline">Find a task →</Link>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {myAppsData?.applications.map((app) => (
+                      app.task && (
+                        <Link key={app.id} href={`/tasks/${app.task.id}`}>
+                          <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between hover:shadow-sm transition-shadow">
+                            <div>
+                              <p className="font-semibold text-[#1B2A4A] text-sm">{app.task.title}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">Applied</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-green-600">${app.task.pay}</span>
+                              {statusBadge(app.status)}
+                            </div>
+                          </div>
+                        </Link>
+                      )
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : myAppsData?.applications.length ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {myAppsData.applications.map(app => (
-                  app.task ? <TaskCard key={app.taskId} task={app.task} /> : null
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 text-center bg-secondary/30 rounded-2xl border border-border border-dashed">
-                <p className="text-muted-foreground">You haven't applied to any tasks yet.</p>
-                <Button variant="link" className="mt-2 text-primary" onClick={() => setActiveTab('browse')}>Browse available tasks</Button>
-              </div>
-            )}
-          </section>
-        </TabsContent>
-      </Tabs>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
