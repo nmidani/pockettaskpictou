@@ -4,6 +4,7 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { Home, Map as MapIcon, PlusCircle, User, LogOut, Loader2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AuthModal } from "@/components/auth-modal";
 
 const PICTOU_BOUNDS = { latMin: 45.4, latMax: 45.9, lngMin: -63.2, lngMax: -62.2 };
 function isInPictouCounty(lat: number, lng: number) {
@@ -16,6 +17,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, login, logout, isLoading } = useAuth();
   const [geoRestricted, setGeoRestricted] = useState(false);
   const [geoDismissed, setGeoDismissed] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
     if (geoDismissed) return;
@@ -41,6 +43,8 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20 md:pb-0 md:pt-16">
+
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} mode="signin" />}
 
       {/* Geo restriction overlay */}
       {geoRestricted && !geoDismissed && (
@@ -94,7 +98,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 </Link>
               </>
             ) : (
-              <Button onClick={login} className="rounded-full bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 px-5">
+              <Button onClick={() => setShowAuthModal(true)} className="rounded-full bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 px-5">
                 Log in / Sign up
               </Button>
             )}
@@ -116,7 +120,7 @@ export function Layout({ children }: { children: ReactNode }) {
               </Avatar>
             </Link>
           ) : (
-            <Button onClick={login} size="sm" className="rounded-full bg-[#1B2A4A] text-xs px-3 h-8">Log in</Button>
+            <Button onClick={() => setShowAuthModal(true)} size="sm" className="rounded-full bg-[#1B2A4A] text-xs px-3 h-8">Log in</Button>
           )
         )}
       </header>

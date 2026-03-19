@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
-import { useEffect } from "react";
-import { ArrowRight, CheckCircle2, MapPin, Star } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AuthModal } from "@/components/auth-modal";
 
 const TOWNS = ["New Glasgow", "Stellarton", "Trenton", "Westville", "Pictou", "River John", "Abercrombie", "Scotsburn"];
 
@@ -20,8 +21,10 @@ const HOW_IT_WORKS = [
 ];
 
 export default function Landing() {
-  const { isAuthenticated, isLoading, login } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<"signin" | "signup">("signin");
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) setLocation("/dashboard");
@@ -29,8 +32,13 @@ export default function Landing() {
 
   if (isLoading || isAuthenticated) return null;
 
+  function openSignUp() { setModalMode("signup"); setShowModal(true); }
+  function openSignIn() { setModalMode("signin"); setShowModal(true); }
+
   return (
     <div className="min-h-screen bg-[#F9F7F4]">
+      {showModal && <AuthModal onClose={() => setShowModal(false)} mode={modalMode} />}
+
       {/* Hero */}
       <section className="relative overflow-hidden bg-[#1B2A4A] text-white">
         <div className="max-w-5xl mx-auto px-6 pt-16 pb-20 flex flex-col items-center text-center">
@@ -42,15 +50,47 @@ export default function Landing() {
             Earn Money Helping<br />
             <span className="text-[#F5A623]">Your Neighbours</span>
           </h1>
-          <p className="text-lg md:text-xl text-white/70 max-w-xl mb-10 leading-relaxed">
+          <p className="text-lg md:text-xl text-white/70 max-w-xl mb-8 leading-relaxed">
             PocketTask connects students and locals in Pictou County with nearby small jobs.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
-            <Button onClick={login} size="lg" className="flex-1 bg-[#F5A623] hover:bg-[#F5A623]/90 text-white rounded-2xl text-base font-bold shadow-lg shadow-[#F5A623]/30 h-13">
-              Post a Task <ArrowRight className="ml-2 w-4 h-4" />
+
+          {/* Auth buttons in hero */}
+          <div className="w-full max-w-xs space-y-3 mb-4">
+            <button
+              onClick={openSignUp}
+              className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-2xl bg-white hover:bg-gray-50 transition-all font-bold text-gray-800 text-sm shadow-lg"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              Sign up with Google
+            </button>
+            <button
+              onClick={openSignUp}
+              className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-2xl bg-black hover:bg-gray-900 transition-all font-bold text-white text-sm shadow-lg"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+              </svg>
+              Sign up with Apple
+            </button>
+            <p className="text-white/50 text-xs text-center">
+              Already have an account?{" "}
+              <button onClick={openSignIn} className="text-white/80 font-semibold hover:text-white underline">
+                Sign in
+              </button>
+            </p>
+          </div>
+
+          <div className="flex gap-3 mt-1">
+            <Button onClick={openSignUp} size="sm" variant="ghost" className="text-white/60 hover:text-white text-xs rounded-full">
+              Post a Task <ArrowRight className="ml-1 w-3 h-3" />
             </Button>
-            <Button onClick={login} size="lg" variant="outline" className="flex-1 rounded-2xl text-base font-bold h-13 border-white/30 text-white hover:bg-white/10 bg-transparent">
-              Find Work
+            <Button onClick={openSignUp} size="sm" variant="ghost" className="text-white/60 hover:text-white text-xs rounded-full">
+              Find Work <ArrowRight className="ml-1 w-3 h-3" />
             </Button>
           </div>
         </div>
@@ -112,7 +152,7 @@ export default function Landing() {
             ))}
           </div>
           <div className="text-center mt-8">
-            <Button onClick={login} size="lg" className="rounded-2xl bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 px-8 font-bold">
+            <Button onClick={openSignUp} size="lg" className="rounded-2xl bg-[#1B2A4A] hover:bg-[#1B2A4A]/90 px-8 font-bold">
               See All Tasks <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </div>
