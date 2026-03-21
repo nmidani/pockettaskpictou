@@ -2,6 +2,9 @@
 
 # compiled output
 dist
+# but keep pockettask's built frontend so deployment can serve it
+!artifacts/pockettask/dist/
+!artifacts/pockettask/dist/**
 tmp
 out-tsc
 *.tsbuildinfo
