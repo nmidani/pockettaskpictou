@@ -48,28 +48,18 @@ export default function PostTask() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/tasks", {
+      const res = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          title: form.title,
-          description: form.description,
-          category: form.category,
-          pay: Number(form.pay),
-          paymentMethod: form.paymentMethod,
-          estimatedHours: form.estimatedHours,
-          town: form.town,
-          locationName: form.locationName || null,
-        }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? "Failed to post task.");
+        setError(data.error ?? "Could not start checkout. Please try again.");
         return;
       }
-      const task = await res.json();
-      setLocation(`/tasks/${task.id}`);
+      // Redirect to Stripe hosted checkout
+      window.location.href = data.url;
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -187,8 +177,12 @@ export default function PostTask() {
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>
         )}
 
+        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700">
+          A one-time <strong>$2.00 CAD</strong> posting fee is required to publish your task. You'll be taken to secure checkout.
+        </div>
+
         <Button type="submit" disabled={loading} className="w-full h-12 rounded-2xl bg-[#F5A623] hover:bg-[#F5A623]/90 text-white font-bold text-base shadow-lg shadow-[#F5A623]/20">
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Post Task"}
+          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Continue to Payment →"}
         </Button>
       </form>
     </div>
