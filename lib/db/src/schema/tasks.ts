@@ -21,6 +21,8 @@ export const tasksTable = pgTable("tasks", {
   claimedById: text("claimed_by_id"),
   claimedAt: timestamp("claimed_at"),
   assignedToId: text("assigned_to_id"),
+  assignedAt: timestamp("assigned_at"),
+  applicationWindowEndsAt: timestamp("application_window_ends_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

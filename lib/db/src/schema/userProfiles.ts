@@ -16,6 +16,7 @@ export const userProfilesTable = pgTable("user_profiles", {
   tasksCompleted: integer("tasks_completed").notNull().default(0),
   rating: real("rating"),
   reviewCount: integer("review_count").notNull().default(0),
+  lastTaskCompletedAt: timestamp("last_task_completed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

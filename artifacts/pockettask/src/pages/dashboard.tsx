@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useGetTasks, useGetMyPostedTasks, useGetMyApplications } from "@workspace/api-client-react";
 import { Task } from "@workspace/api-client-react";
-import { PlusCircle, MapPin, Clock, Banknote, Smartphone, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { PlusCircle, MapPin, Clock, Banknote, Smartphone, CheckCircle2, AlertCircle, Loader2, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const CATEGORIES = ["All", "Yard Work", "Cleaning", "Moving Help", "Dog Walking", "Grocery Pickup", "Tech Help", "Small Repairs", "Other"];
@@ -21,6 +21,21 @@ function useToast() {
   return { toasts, show };
 }
 
+function useCountdown(endsAt: string | null | undefined): number {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (!endsAt) { setSeconds(0); return; }
+    function tick() {
+      const diff = Math.max(0, Math.floor((new Date(endsAt).getTime() - Date.now()) / 1000));
+      setSeconds(diff);
+    }
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [endsAt]);
+  return seconds;
+}
+
 function statusBadge(status: string) {
   if (status === "open") return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Open</span>;
   if (status === "claimed") return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Taken</span>;
@@ -28,22 +43,46 @@ function statusBadge(status: string) {
   return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">{status}</span>;
 }
 
-function TaskCard({ task, userId, onClaimed }: { task: Task; userId?: string; onClaimed: (id: number) => void }) {
-  const [claiming, setClaiming] = useState(false);
+function TaskCard({ task, userId, onApplied }: { task: Task; userId?: string; onApplied: (id: number, success: boolean) => void }) {
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied] = useState(false);
   const isOwn = task.postedById === userId;
-  const canClaim = task.status === "open" && !isOwn && !!userId;
+  const windowEndsAt = (task as any).applicationWindowEndsAt as string | null | undefined;
+  const secondsLeft = useCountdown(windowEndsAt);
+  const windowOpen = secondsLeft > 0 && task.status === "open";
+  const canApply = windowOpen && !isOwn && !!userId && !applied;
 
-  async function handleClaim() {
-    setClaiming(true);
+  async function handleApply() {
+    setApplying(true);
     try {
-      const res = await fetch(`/api/tasks/${task.id}/claim`, { method: "POST", credentials: "include" });
-      if (res.status === 409) {
-        onClaimed(-task.id); // negative = error
-      } else if (res.ok) {
-        onClaimed(task.id);
+      let lat: number | null = null;
+      let lng: number | null = null;
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000 })
+        );
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch {}
+
+      const res = await fetch(`/api/tasks/${task.id}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ lat, lng }),
+      });
+      if (res.ok) {
+        setApplied(true);
+        onApplied(task.id, true);
+      } else if (res.status === 409) {
+        onApplied(-task.id, false);
+      } else {
+        const d = await res.json();
+        onApplied(-task.id, false);
+        console.warn(d.error);
       }
     } finally {
-      setClaiming(false);
+      setApplying(false);
     }
   }
 
@@ -54,6 +93,14 @@ function TaskCard({ task, userId, onClaimed }: { task: Task; userId?: string; on
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-xs font-bold text-[#F5A623] uppercase tracking-wider">{task.category}</span>
             {statusBadge(task.status)}
+            {windowOpen && (
+              <span className="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                <Timer className="w-3 h-3" />{secondsLeft}s
+              </span>
+            )}
+            {task.status === "open" && !windowOpen && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">Assigning…</span>
+            )}
           </div>
           <Link href={`/tasks/${task.id}`}>
             <h3 className="font-bold text-[#1B2A4A] text-base leading-snug hover:underline cursor-pointer line-clamp-1">{task.title}</h3>
@@ -71,15 +118,28 @@ function TaskCard({ task, userId, onClaimed }: { task: Task; userId?: string; on
           {task.paymentMethod === "etransfer" ? "eTransfer" : "Cash"}
         </span>
       </div>
+
+      {/* Fairness message on open tasks */}
+      {task.status === "open" && (
+        <p className="text-[10px] text-gray-400 mb-2 italic">
+          Tasks are assigned fairly based on distance, reliability, and recent activity.
+        </p>
+      )}
+
       <div className="flex gap-2">
         <Link href={`/tasks/${task.id}`} className="flex-1">
           <Button variant="outline" size="sm" className="w-full rounded-xl text-xs font-semibold">View Details</Button>
         </Link>
-        {canClaim && (
-          <Button size="sm" onClick={handleClaim} disabled={claiming}
+        {canApply && (
+          <Button size="sm" onClick={handleApply} disabled={applying}
             className="flex-1 rounded-xl text-xs font-bold bg-[#F5A623] hover:bg-[#F5A623]/90 text-white">
-            {claiming ? <Loader2 className="w-3 h-3 animate-spin" /> : "Claim Task"}
+            {applying ? <Loader2 className="w-3 h-3 animate-spin" /> : "Apply →"}
           </Button>
+        )}
+        {applied && (
+          <span className="flex items-center gap-1 text-xs text-green-600 font-bold px-2">
+            <CheckCircle2 className="w-3 h-3" />Applied
+          </span>
         )}
         {isOwn && (
           <span className="flex items-center text-xs text-gray-400 px-2">Your task</span>
@@ -96,7 +156,6 @@ export default function Dashboard() {
   const [category, setCategory] = useState("All");
   const [town, setTown] = useState("All Towns");
   const { toasts, show: showToast } = useToast();
-  const [claimedIds, setClaimedIds] = useState<Set<number>>(new Set());
 
   const { data: tasksData, isLoading, refetch } = useGetTasks({
     ...(category !== "All" ? { category } : {}),
@@ -106,14 +165,18 @@ export default function Dashboard() {
   const { data: myTasksData } = useGetMyPostedTasks();
   const { data: myAppsData } = useGetMyApplications();
 
-  function handleClaimed(id: number) {
-    if (id < 0) {
-      showToast("This task has already been taken.", "error");
+  // Poll for task updates every 5 seconds so assignment results appear
+  useEffect(() => {
+    const id = setInterval(() => refetch(), 5000);
+    return () => clearInterval(id);
+  }, [refetch]);
+
+  function handleApplied(id: number, success: boolean) {
+    if (!success) {
+      showToast("Could not apply — window may have closed.", "error");
     } else {
-      showToast("Task claimed! Head to the task page to chat.", "success");
-      setClaimedIds((s) => new Set([...s, id]));
+      showToast("Applied! You'll be notified of the result shortly.", "success");
       refetch();
-      setTimeout(() => setLocation(`/tasks/${id}`), 1200);
     }
   }
 
@@ -159,7 +222,6 @@ export default function Dashboard() {
       {/* Browse Tasks */}
       {tab === "browse" && (
         <>
-          {/* Category scroll */}
           <div className="flex gap-2 overflow-x-auto pb-2 mb-3 scrollbar-hide snap-x">
             {CATEGORIES.map((cat) => (
               <button key={cat} onClick={() => setCategory(cat)} className={`shrink-0 snap-start px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${category === cat ? "bg-[#1B2A4A] text-white border-[#1B2A4A]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
@@ -167,7 +229,6 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
-          {/* Town filter */}
           <div className="mb-4">
             <select value={town} onChange={(e) => setTown(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20">
@@ -189,7 +250,7 @@ export default function Dashboard() {
           ) : (
             <div className="grid gap-3">
               {tasks.map((task) => (
-                <TaskCard key={task.id} task={task} userId={user?.id} onClaimed={handleClaimed} />
+                <TaskCard key={task.id} task={task} userId={user?.id} onApplied={handleApplied} />
               ))}
             </div>
           )}
@@ -253,11 +314,15 @@ export default function Dashboard() {
                           <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between hover:shadow-sm transition-shadow">
                             <div>
                               <p className="font-semibold text-[#1B2A4A] text-sm">{app.task.title}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">Applied</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {app.status === "accepted" ? "✅ You got the task!" : app.status === "rejected" ? "Task assigned to another applicant" : "Applied — awaiting result"}
+                              </p>
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-green-600">${app.task.pay}</span>
-                              {statusBadge(app.status)}
+                              {app.status === "accepted" && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Won</span>}
+                              {app.status === "rejected" && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Missed</span>}
+                              {app.status === "pending" && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Pending</span>}
                             </div>
                           </div>
                         </Link>

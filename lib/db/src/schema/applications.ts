@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { tasksTable } from "./tasks";
 
@@ -10,6 +10,9 @@ export const applicationsTable = pgTable("applications", {
   applicantId: text("applicant_id").notNull(),
   message: text("message"),
   status: applicationStatusEnum("status").notNull().default("pending"),
+  applicantLat: real("applicant_lat"),
+  applicantLng: real("applicant_lng"),
+  score: real("score"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

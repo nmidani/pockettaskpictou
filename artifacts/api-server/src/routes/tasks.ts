@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { db, tasksTable, applicationsTable } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { db, tasksTable, applicationsTable, userProfilesTable } from "@workspace/db";
+import { eq, and, desc, sql, or } from "drizzle-orm";
 import { getUserInfo } from "../lib/userInfo";
+import { APPLICATION_WINDOW_SECONDS } from "../lib/assignmentScheduler";
 
 const router: IRouter = Router();
 
@@ -46,6 +47,10 @@ router.post("/tasks", async (req, res) => {
       return;
     }
     await ensureProfile(req.user.id);
+
+    // Set the 30-second application window starting now
+    const windowEndsAt = new Date(Date.now() + APPLICATION_WINDOW_SECONDS * 1000);
+
     const [task] = await db.insert(tasksTable).values({
       title, description, category,
       pay: Number(pay),
@@ -56,6 +61,7 @@ router.post("/tasks", async (req, res) => {
       town: town || null,
       estimatedHours: estimatedHours != null ? Number(estimatedHours) : null,
       postedById: req.user.id,
+      applicationWindowEndsAt: windowEndsAt,
     }).returning();
 
     await db.execute(
@@ -82,11 +88,20 @@ router.get("/tasks/:id", async (req, res) => {
     const appCount = await db.select({ count: sql<number>`count(*)` })
       .from(applicationsTable).where(eq(applicationsTable.taskId, id));
 
+    // Check if current user has applied
+    let userApplication = null;
+    if ((req as any).user?.id) {
+      const [existing] = await db.select().from(applicationsTable)
+        .where(and(eq(applicationsTable.taskId, id), eq(applicationsTable.applicantId, (req as any).user.id)));
+      userApplication = existing ?? null;
+    }
+
     res.json({
       ...task,
       postedBy: postedBy || { id: task.postedById, username: "User" },
       claimedBy,
       applicationCount: Number(appCount[0]?.count || 0),
+      userApplication,
     });
   } catch (err) {
     console.error(err);
@@ -136,7 +151,62 @@ router.delete("/tasks/:id", async (req, res) => {
   }
 });
 
-// First-come first-served task claiming
+// Fair apply — replaces first-come-first-served claim
+router.post("/tasks/:id/apply", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const taskId = parseInt(req.params.id);
+    const { lat, lng } = req.body;
+
+    const [task] = await db.select().from(tasksTable).where(eq(tasksTable.id, taskId));
+    if (!task) { res.status(404).json({ error: "Task not found" }); return; }
+    if (task.postedById === req.user.id) {
+      res.status(400).json({ error: "You cannot apply to your own task" }); return;
+    }
+    if (task.status !== "open") {
+      res.status(409).json({ error: "This task is no longer accepting applications" }); return;
+    }
+
+    // Check the application window is still open
+    const now = new Date();
+    if (task.applicationWindowEndsAt && task.applicationWindowEndsAt < now) {
+      res.status(409).json({ error: "The application window for this task has closed" }); return;
+    }
+
+    await ensureProfile(req.user.id);
+
+    // Check active task limit (max 2 assigned tasks at once)
+    const [activeCount] = await db.execute(sql`
+      SELECT COUNT(*) as count FROM tasks
+      WHERE (claimed_by_id = ${req.user.id} OR assigned_to_id = ${req.user.id})
+        AND status IN ('claimed', 'in_progress')
+    `);
+    if (Number((activeCount as any).count) >= 2) {
+      res.status(400).json({ error: "You already have 2 active tasks. Complete one before applying to more." }); return;
+    }
+
+    // Check not already applied
+    const [existing] = await db.select().from(applicationsTable)
+      .where(and(eq(applicationsTable.taskId, taskId), eq(applicationsTable.applicantId, req.user.id)));
+    if (existing) {
+      res.status(409).json({ error: "You have already applied to this task" }); return;
+    }
+
+    const [app] = await db.insert(applicationsTable).values({
+      taskId,
+      applicantId: req.user.id,
+      applicantLat: lat != null ? Number(lat) : null,
+      applicantLng: lng != null ? Number(lng) : null,
+    }).returning();
+
+    res.status(201).json({ ...app, message: "Application submitted! Results are assigned fairly within 30 seconds." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to apply to task" });
+  }
+});
+
+// Legacy claim route kept for backward compatibility
 router.post("/tasks/:id/claim", async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   try {
@@ -149,11 +219,7 @@ router.post("/tasks/:id/claim", async (req, res) => {
     if (task.status !== "open") {
       res.status(409).json({ error: "This task has already been taken." }); return;
     }
-    if (task.claimedById) {
-      res.status(409).json({ error: "This task has already been taken." }); return;
-    }
 
-    // Atomic claim - use UPDATE with WHERE to prevent race conditions
     const result = await db.execute(sql`
       UPDATE tasks SET
         claimed_by_id = ${req.user.id},
@@ -193,11 +259,15 @@ router.post("/tasks/:id/complete", async (req, res) => {
       .where(eq(tasksTable.id, id))
       .returning();
 
-    // Update task taker's completed count
+    // Update task taker's completed count and last completed timestamp
     if (task.claimedById) {
       await db.execute(sql`
-        INSERT INTO user_profiles (id, tasks_completed) VALUES (${task.claimedById}, 1)
-        ON CONFLICT (id) DO UPDATE SET tasks_completed = user_profiles.tasks_completed + 1, updated_at = NOW()
+        INSERT INTO user_profiles (id, tasks_completed, last_task_completed_at)
+        VALUES (${task.claimedById}, 1, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          tasks_completed = user_profiles.tasks_completed + 1,
+          last_task_completed_at = NOW(),
+          updated_at = NOW()
       `);
     }
 

@@ -1,0 +1,166 @@
+Implement a FAIR TASK ASSIGNMENT SYSTEM in the PocketTask app replacing the current "first-come-first-serve" model.
+
+The system must be fully functional across frontend and backend.
+
+---
+
+## CORE FEATURE: TIMED APPLICATION WINDOW
+
+When a task is posted:
+
+1. The task enters an "OPEN" state for 30 seconds.
+2. During these 30 seconds, nearby Task Takers can click "Apply".
+3. Store all applicants in a list linked to the task.
+
+Add these fields to the Task model:
+
+* status: "open" | "assigned" | "completed"
+* applicants: array of user IDs
+* createdAt (timestamp)
+* assignedTo (user ID)
+* assignedAt (timestamp)
+
+---
+
+## BACKEND LOGIC
+
+After 30 seconds from task creation:
+
+1. Automatically trigger a selection function.
+
+2. For each applicant, calculate a SCORE using:
+
+* Distance (closer = higher score)
+* Fairness boost (users who haven't received tasks recently get higher score)
+* Rating (higher rating = higher score)
+
+Example scoring logic:
+
+score =
+(1 / distance_in_km) * 50 +
+fairnessScore * 30 +
+rating * 20
+
+Where:
+
+* fairnessScore = number of hours since last completed task (normalized)
+* rating = from 1 to 5
+
+3. Select the user with the highest score.
+
+4. Assign the task:
+
+* status → "assigned"
+* assignedTo → selected user
+* assignedAt → timestamp
+
+5. Notify all applicants:
+
+* Selected user → "You got the task"
+* Others → "Task assigned to another user"
+
+---
+
+## DISTANCE CALCULATION
+
+Each user and task must have coordinates (latitude, longitude).
+
+Use Haversine formula to calculate distance between user and task.
+
+---
+
+## FRONTEND CHANGES
+
+1. Task Card:
+
+* Show countdown timer (30 seconds)
+* Show "Apply" button during open state
+* After applying → show "Applied"
+
+2. After selection:
+
+* If selected → show "Task Assigned to You"
+* If not selected → show "Task no longer available"
+
+3. Disable Apply button after 30 seconds.
+
+---
+
+## REAL-TIME UPDATE
+
+Use polling (every 5 seconds) OR WebSockets to update:
+
+* countdown timer
+* task status
+* assignment result
+
+---
+
+## FAIRNESS RULES
+
+1. Limit active tasks:
+
+* Each user can have max 2 active tasks
+
+2. Fairness boost:
+
+* Users who have not completed a task recently get priority
+
+Store in user model:
+
+* lastTaskCompletedAt
+
+---
+
+## DATABASE UPDATES
+
+Update User model:
+
+* rating
+* tasksCompleted
+* lastTaskCompletedAt
+
+---
+
+## FAILSAFE
+
+If no applicants after 30 seconds:
+
+* Keep task open OR extend window by 30 seconds
+
+---
+
+## UI MESSAGE
+
+Display to users:
+
+"Tasks are assigned fairly based on distance, reliability, and recent activity."
+
+---
+
+## TESTING
+
+Test scenarios:
+
+1. Multiple users apply → best score gets task
+2. Single applicant → gets task
+3. No applicants → task remains open
+4. Users cannot apply if already at max active tasks
+
+Ensure system works end-to-end without crashes.
+
+---
+
+## IMPORTANT
+
+* Do not break existing features
+* Keep code clean and modular
+* Add comments explaining scoring logic
+* Ensure both frontend and backend are connected properly
+* Ensure no blank page or crashes
+
+---
+
+## FINAL RESULT
+
+A fully working fair task assignment system replacing first-come-first-serve.
