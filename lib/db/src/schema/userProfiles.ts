@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, timestamp, boolean } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 
 export const PICTOU_TOWNS = [
@@ -12,11 +12,20 @@ export const userProfilesTable = pgTable("user_profiles", {
   town: text("town"),
   bio: text("bio"),
   phone: text("phone"),
+  isPhoneVerified: boolean("is_phone_verified").notNull().default(false),
+  phoneVerificationCode: text("phone_verification_code"),
   tasksPosted: integer("tasks_posted").notNull().default(0),
   tasksCompleted: integer("tasks_completed").notNull().default(0),
   rating: real("rating"),
   reviewCount: integer("review_count").notNull().default(0),
+  trustScore: integer("trust_score").notNull().default(0),
+  reportsCount: integer("reports_count").notNull().default(0),
   lastTaskCompletedAt: timestamp("last_task_completed_at"),
+  // Anti-spam daily limits
+  postsToday: integer("posts_today").notNull().default(0),
+  appliesToday: integer("applies_today").notNull().default(0),
+  dailyResetAt: timestamp("daily_reset_at"),
+  lastActionAt: timestamp("last_action_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

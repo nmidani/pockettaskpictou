@@ -3,6 +3,7 @@ import { db, tasksTable, applicationsTable, userProfilesTable } from "@workspace
 import { eq, and, desc, sql, or } from "drizzle-orm";
 import { getUserInfo } from "../lib/userInfo";
 import { APPLICATION_WINDOW_SECONDS } from "../lib/assignmentScheduler";
+import { checkSpamLimits, recalcTrustScore } from "../lib/trustScore";
 
 const router: IRouter = Router();
 
@@ -47,6 +48,13 @@ router.post("/tasks", async (req, res) => {
       return;
     }
     await ensureProfile(req.user.id);
+
+    // Anti-spam: daily post limit + cooldown
+    const spamErr = await checkSpamLimits(req.user.id, "post");
+    if (spamErr) {
+      res.status(429).json({ error: spamErr });
+      return;
+    }
 
     // Set the 30-second application window starting now
     const windowEndsAt = new Date(Date.now() + APPLICATION_WINDOW_SECONDS * 1000);
@@ -175,6 +183,13 @@ router.post("/tasks/:id/apply", async (req, res) => {
 
     await ensureProfile(req.user.id);
 
+    // Anti-spam: daily apply limit + cooldown
+    const spamErr = await checkSpamLimits(req.user.id, "apply");
+    if (spamErr) {
+      res.status(429).json({ error: spamErr });
+      return;
+    }
+
     // Check active task limit (max 2 assigned tasks at once)
     const [activeCount] = await db.execute(sql`
       SELECT COUNT(*) as count FROM tasks
@@ -269,6 +284,8 @@ router.post("/tasks/:id/complete", async (req, res) => {
           last_task_completed_at = NOW(),
           updated_at = NOW()
       `);
+      // Recalculate trust score after new completion
+      await recalcTrustScore(task.claimedById);
     }
 
     res.json(updated);

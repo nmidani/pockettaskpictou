@@ -21,24 +21,22 @@ const FAIRNESS_CAP_HOURS = 72;
 /**
  * Compute a 0–100 composite score from three normalized factors.
  *
- * Distance  (40 pts) – exponential decay, no singularity. Unknown = neutral (0.5).
- * Fairness  (35 pts) – hours since last completed task, capped at 72 h.
- *                      Never completed a task → maximum boost.
- * Rating    (25 pts) – 1–5 stars normalized to 0–1. Unknown = neutral (0.5).
+ * Distance   (40 pts) – exponential decay, no singularity. Unknown = neutral (0.5).
+ * Fairness   (35 pts) – hours since last completed task, capped at 72 h.
+ *                       Never completed a task → maximum boost.
+ * TrustScore (25 pts) – 0–100 composite of completions, rating, reports.
+ *                       Normalized to [0, 1]. New users default to 0.5 (neutral).
  *
- * All three components are independently bounded to [0, weight], so no single
- * factor can overwhelm the others regardless of the input values.
+ * All components are independently bounded so no single factor can dominate.
  */
 function calcScore(opts: {
   distanceKm: number | null;
   hoursSinceLastTask: number | null;
-  rating: number | null;
+  trustScore: number | null;
 }): number {
-  const { distanceKm, hoursSinceLastTask, rating } = opts;
+  const { distanceKm, hoursSinceLastTask, trustScore } = opts;
 
   // ── Distance (0–40 pts) ────────────────────────────────────────────────────
-  // Exponential decay: score = e^(-d / halfLife). If location is unknown,
-  // award neutral credit (0.5) rather than penalising the applicant.
   const distFactor =
     distanceKm != null && distanceKm >= 0
       ? Math.exp(-distanceKm / DISTANCE_HALF_LIFE_KM)
@@ -46,23 +44,23 @@ function calcScore(opts: {
   const distScore = distFactor * WEIGHT_DISTANCE;
 
   // ── Fairness (0–35 pts) ────────────────────────────────────────────────────
-  // Applicants who haven't completed a task recently get higher priority.
-  // "Never completed" → full boost. Recent completion → 0.
   const fairnessFactor =
     hoursSinceLastTask != null
       ? Math.min(hoursSinceLastTask / FAIRNESS_CAP_HOURS, 1.0)
       : 1.0;
   const fairnessScore = fairnessFactor * WEIGHT_FAIRNESS;
 
-  // ── Rating (0–25 pts) ──────────────────────────────────────────────────────
-  // Normalise from the 1–5 scale to [0, 1]. New users (null) get neutral (0.5).
-  const ratingFactor =
-    rating != null
-      ? Math.max(0, Math.min((rating - 1) / 4, 1.0))
+  // ── Trust score (0–25 pts) ─────────────────────────────────────────────────
+  // trustScore is 0–100; normalize to [0, 1].
+  // New users have trustScore 0 from the DB default, but we give them 0.5
+  // (neutral) so they aren't permanently disadvantaged before any activity.
+  const trustFactor =
+    trustScore != null && trustScore > 0
+      ? Math.min(trustScore / 100, 1.0)
       : 0.5;
-  const ratingScore = ratingFactor * WEIGHT_RATING;
+  const trustScorePoints = trustFactor * WEIGHT_RATING;
 
-  return distScore + fairnessScore + ratingScore;
+  return distScore + fairnessScore + trustScorePoints;
 }
 
 async function processExpiredWindows() {
@@ -132,7 +130,7 @@ async function processExpiredWindows() {
           const score = calcScore({
             distanceKm,
             hoursSinceLastTask,
-            rating: profile?.rating ?? null,
+            trustScore: profile?.trustScore ?? null,
           });
 
           return { app, score };

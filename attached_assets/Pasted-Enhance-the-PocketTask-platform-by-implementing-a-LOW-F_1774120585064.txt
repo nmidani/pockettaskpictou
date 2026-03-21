@@ -1,0 +1,200 @@
+Enhance the PocketTask platform by implementing a LOW-FRICTION TRUST + ANTI-SPAM SYSTEM.
+
+Do NOT add mandatory ID verification. Keep onboarding simple, fast, and user-friendly while preventing abuse and increasing trust.
+
+---
+
+## GOAL
+
+* Allow users to sign up quickly
+* Prevent spam and fake activity
+* Build trust between users
+* Keep system scalable for future verification features
+
+---
+
+1. PHONE VERIFICATION (SIMULATED OR REAL)
+
+---
+
+Require phone number during signup.
+
+Steps:
+
+* User enters phone number
+* Send or simulate SMS code verification
+* Only allow one account per phone number
+
+Store in user model:
+
+* phoneNumber (unique)
+* isPhoneVerified (true/false)
+
+---
+
+2. USER TRUST PROFILE
+
+---
+
+Enhance user profiles to include:
+
+* rating (average 1–5 stars)
+* tasksCompleted (integer)
+* trustScore (0–100)
+* lastTaskCompletedAt (timestamp)
+* reportsCount (integer)
+
+Display on frontend:
+
+Name
+Town
+⭐ Rating
+✔ Tasks completed
+🔥 Trust Score %
+
+---
+
+3. TRUST SCORE SYSTEM
+
+---
+
+Calculate trustScore dynamically based on:
+
+* completed tasks (+ points)
+* good ratings (+ points)
+* cancellations (- points)
+* reports (- points)
+
+Example logic:
+
+trustScore =
+(tasksCompleted * 5) +
+(rating * 10) -
+(reportsCount * 15)
+
+Clamp between 0 and 100.
+
+---
+
+4. ANTI-SPAM LIMITS
+
+---
+
+Implement action limits:
+
+* Max 3 task posts per day per user
+* Max 10 task applications per day
+* Add 10-second cooldown between actions
+
+If exceeded, show message:
+
+"You have reached your daily limit. Please try again later."
+
+---
+
+5. ACTIVE TASK LIMIT
+
+---
+
+Prevent task hoarding:
+
+* Each user can have max 2 active tasks at a time
+
+Block applying if limit reached.
+
+---
+
+6. REPORT SYSTEM
+
+---
+
+Add "Report" button on:
+
+* user profiles
+* tasks
+
+Report reasons:
+
+* Did not show up
+* Payment issue
+* Spam
+* Harassment
+* Unsafe task
+
+When reported:
+
+* Increment reportsCount
+* If reportsCount >= 3 → flag user
+
+---
+
+7. AUTO-PENALTIES
+
+---
+
+If user behavior is bad:
+
+* Reduce trustScore
+* Show warning message
+* Temporarily restrict actions
+
+Example:
+
+"If your behavior continues, your account may be suspended."
+
+---
+
+8. FAIRNESS SUPPORT
+
+---
+
+Integrate trustScore into task assignment:
+
+* Higher trustScore = higher priority
+* But still balanced with fairness (recent activity)
+
+---
+
+9. UI TRANSPARENCY
+
+---
+
+Display message across platform:
+
+"Users are ranked based on reliability, fairness, and recent activity."
+
+---
+
+10. FUTURE READY (DO NOT IMPLEMENT YET)
+
+---
+
+Prepare structure for:
+
+* optional ID verification badge
+* verified users get higher trustScore
+
+---
+
+11. SAFETY CHECKS
+
+---
+
+Ensure:
+
+* system does not block normal users too aggressively
+* all limits reset daily
+* no crashes or blank pages
+* clean error handling
+
+---
+
+## FINAL RESULT
+
+A balanced system where:
+
+* users can join easily
+* spam is controlled
+* trust is visible
+* fairness is maintained
+* platform feels safe and reliable

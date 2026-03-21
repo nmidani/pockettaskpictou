@@ -43,7 +43,7 @@ function statusBadge(status: string) {
   return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">{status}</span>;
 }
 
-function TaskCard({ task, userId, onApplied }: { task: Task; userId?: string; onApplied: (id: number, success: boolean) => void }) {
+function TaskCard({ task, userId, onApplied }: { task: Task; userId?: string; onApplied: (id: number, success: boolean, error?: string) => void }) {
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
   const isOwn = task.postedById === userId;
@@ -74,12 +74,9 @@ function TaskCard({ task, userId, onApplied }: { task: Task; userId?: string; on
       if (res.ok) {
         setApplied(true);
         onApplied(task.id, true);
-      } else if (res.status === 409) {
-        onApplied(-task.id, false);
       } else {
         const d = await res.json();
-        onApplied(-task.id, false);
-        console.warn(d.error);
+        onApplied(-task.id, false, d.error);
       }
     } finally {
       setApplying(false);
@@ -171,9 +168,9 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, [refetch]);
 
-  function handleApplied(id: number, success: boolean) {
+  function handleApplied(id: number, success: boolean, error?: string) {
     if (!success) {
-      showToast("Could not apply — window may have closed.", "error");
+      showToast(error ?? "Could not apply — window may have closed.", "error");
     } else {
       showToast("Applied! You'll be notified of the result shortly.", "success");
       refetch();
