@@ -194,7 +194,7 @@ router.get("/success", async (req, res) => {
       .returning({ id: tasksTable.id });
 
     console.log(`[stripe/success] task ${task.id} created for user ${userId} (session ${session_id})`);
-    res.redirect(`/tasks/${task.id}`);
+    res.redirect(`/tasks/${task.id}?from=payment`);
   } catch (err: any) {
     console.error("[stripe/success] error:", err.message);
     res.redirect("/post-task?payment=error");

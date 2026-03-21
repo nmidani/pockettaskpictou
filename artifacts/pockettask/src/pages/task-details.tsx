@@ -1,10 +1,10 @@
-import { useParams, Link } from "wouter";
+import { useParams, Link, useSearch } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useGetTask } from "@workspace/api-client-react";
 import { useEffect, useRef, useState } from "react";
 import {
   Loader2, MapPin, Clock, Banknote, Smartphone, Star,
-  AlertTriangle, Send, CheckCircle2, AlertCircle, ArrowLeft, Timer, Users
+  AlertTriangle, Send, CheckCircle2, AlertCircle, ArrowLeft, Timer, Users, PartyPopper
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -51,6 +51,8 @@ const REPORT_REASONS = ["Did not show up", "Scam", "Harassment", "Unsafe task", 
 export default function TaskDetails() {
   const { id } = useParams<{ id: string }>();
   const { user, isAuthenticated, login } = useAuth();
+  const search = useSearch();
+  const fromPayment = new URLSearchParams(search).get("from") === "payment";
   const taskId = parseInt(id);
   const { data: task, isLoading, refetch } = useGetTask(taskId);
 
@@ -243,6 +245,17 @@ export default function TaskDetails() {
       <Link href="/dashboard" className="flex items-center gap-1 text-sm text-gray-500 hover:text-[#1B2A4A] font-medium">
         <ArrowLeft className="w-4 h-4" />Back to Dashboard
       </Link>
+
+      {/* Payment success banner */}
+      {fromPayment && (
+        <div className="flex items-start gap-3 bg-green-50 border border-green-300 rounded-2xl px-4 py-4 shadow-sm">
+          <PartyPopper className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-green-800 text-sm">Your task is live!</p>
+            <p className="text-xs text-green-700 mt-0.5">Payment confirmed. Locals in your area can now see and apply for it.</p>
+          </div>
+        </div>
+      )}
 
       {/* Task card */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">

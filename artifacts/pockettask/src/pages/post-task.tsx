@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
-import { Loader2, MapPin, Banknote, Smartphone, Clock } from "lucide-react";
+import { Loader2, MapPin, Banknote, Smartphone, Clock, ShieldCheck, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const CATEGORIES = ["Yard Work", "Cleaning", "Moving Help", "Dog Walking", "Grocery Pickup", "Tech Help", "Small Repairs", "Other"];
@@ -17,7 +17,12 @@ const DURATIONS = [
 export default function PostTask() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const wasCancelled = params.get("payment") === "cancelled";
+
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
@@ -35,17 +40,22 @@ export default function PostTask() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  const payNum = Number(form.pay);
+  const payValid = form.pay !== "" && !Number.isNaN(payNum) && payNum >= 1;
+  const totalDue = payValid ? (payNum + 2).toFixed(2) : null;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim() || !form.description.trim() || !form.pay) {
       setError("Please fill in all required fields.");
       return;
     }
-    if (Number(form.pay) < 1) {
+    if (!payValid) {
       setError("Payment must be at least $1.");
       return;
     }
     setLoading(true);
+    setRedirecting(false);
     setError(null);
     try {
       const res = await fetch("/api/create-checkout-session", {
@@ -56,7 +66,7 @@ export default function PostTask() {
           title: form.title,
           description: form.description,
           category: form.category,
-          pay: Number(form.pay),
+          pay: payNum,
           paymentMethod: form.paymentMethod,
           estimatedHours: form.estimatedHours,
           town: form.town,
@@ -68,7 +78,7 @@ export default function PostTask() {
         setError(data.error ?? "Could not start checkout. Please try again.");
         return;
       }
-      // Redirect to Stripe hosted checkout
+      setRedirecting(true);
       window.location.href = data.url;
     } catch {
       setError("Network error. Please try again.");
@@ -83,6 +93,14 @@ export default function PostTask() {
         <h1 className="text-2xl font-extrabold text-[#1B2A4A]">Post a Task</h1>
         <p className="text-gray-500 text-sm mt-1">Describe the job and set your price. Locals will see it immediately.</p>
       </div>
+
+      {/* Cancelled notice */}
+      {wasCancelled && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+          <XCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-sm text-amber-800">Payment was cancelled — your task was not posted. Fill in the form again whenever you're ready.</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Title */}
@@ -184,16 +202,53 @@ export default function PostTask() {
           />
         </div>
 
+        {/* Fee breakdown */}
+        <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 space-y-2">
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Task pay for worker</span>
+              <span className="font-semibold text-gray-800">
+                {payValid ? `$${payNum.toFixed(2)} CAD` : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>PocketTask posting fee</span>
+              <span className="font-semibold text-gray-800">$2.00 CAD</span>
+            </div>
+            {totalDue && (
+              <>
+                <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-[#1B2A4A]">
+                  <span>Due today</span>
+                  <span>${totalDue} CAD</span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="bg-[#1B2A4A]/5 border-t border-gray-200 px-4 py-2.5 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-[#1B2A4A]/60 shrink-0" />
+            <p className="text-xs text-gray-500">A small fee helps keep PocketTask safe and spam-free.</p>
+          </div>
+        </div>
+
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>
         )}
 
-        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700">
-          A one-time <strong>$2.00 CAD</strong> posting fee is required to publish your task. You'll be taken to secure checkout.
-        </div>
-
-        <Button type="submit" disabled={loading} className="w-full h-12 rounded-2xl bg-[#F5A623] hover:bg-[#F5A623]/90 text-white font-bold text-base shadow-lg shadow-[#F5A623]/20">
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Continue to Payment →"}
+        <Button
+          type="submit"
+          disabled={loading || redirecting}
+          className="w-full h-12 rounded-2xl bg-[#F5A623] hover:bg-[#F5A623]/90 text-white font-bold text-base shadow-lg shadow-[#F5A623]/20"
+        >
+          {redirecting ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Redirecting to Stripe…
+            </span>
+          ) : loading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            "Continue to Payment →"
+          )}
         </Button>
       </form>
     </div>
