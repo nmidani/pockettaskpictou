@@ -23,6 +23,7 @@ export const tasksTable = pgTable("tasks", {
   assignedToId: text("assigned_to_id"),
   assignedAt: timestamp("assigned_at"),
   applicationWindowEndsAt: timestamp("application_window_ends_at"),
+  stripeSessionId: text("stripe_session_id").unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

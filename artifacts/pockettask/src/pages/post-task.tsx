@@ -52,6 +52,16 @@ export default function PostTask() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          category: form.category,
+          pay: Number(form.pay),
+          paymentMethod: form.paymentMethod,
+          estimatedHours: form.estimatedHours,
+          town: form.town,
+          locationName: form.locationName || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -95,6 +105,7 @@ export default function PostTask() {
             onChange={(e) => set("description", e.target.value)}
             placeholder="Describe what needs to be done, any special requirements…"
             rows={4}
+            maxLength={490}
             className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 resize-none"
           />
         </div>
