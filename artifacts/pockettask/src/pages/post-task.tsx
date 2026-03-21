@@ -1,10 +1,246 @@
 import { useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
-import { Loader2, MapPin, Banknote, Smartphone, Clock, ShieldCheck, XCircle } from "lucide-react";
+import { Loader2, MapPin, Banknote, Smartphone, Clock, ShieldCheck, XCircle, ChevronDown, ChevronUp, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const CATEGORIES = ["Yard Work", "Cleaning", "Moving Help", "Dog Walking", "Grocery Pickup", "Tech Help", "Small Repairs", "Other"];
+// ─── Category data ────────────────────────────────────────────────────────────
+
+type CategoryDef = {
+  id: string;
+  emoji: string;
+  title: string;
+  tagline: string;
+  examples: string[];
+  more: string[];
+};
+
+const CATEGORY_DEFS: CategoryDef[] = [
+  {
+    id: "Home Help",
+    emoji: "🏠",
+    title: "Home Help",
+    tagline: "Indoor fixes & household tasks",
+    examples: ["Fix a leaky faucet", "Replace a light bulb", "Assemble flat-pack furniture", "Hang shelves or pictures"],
+    more: ["Paint a room", "Repair a door hinge", "Caulk a bathtub", "Install a curtain rod"],
+  },
+  {
+    id: "Outdoor & Yard",
+    emoji: "🌿",
+    title: "Outdoor & Yard",
+    tagline: "Lawn care, snow shoveling, garden work",
+    examples: ["Mow the front lawn", "Shovel snow from driveway", "Rake leaves", "Weed flower beds"],
+    more: ["Trim hedges", "Spread mulch", "Clean eavestroughs", "Pressure wash the deck"],
+  },
+  {
+    id: "Moving & Heavy Help",
+    emoji: "📦",
+    title: "Moving & Heavy Help",
+    tagline: "Lifting, hauling, and moving assistance",
+    examples: ["Help load a moving truck", "Carry furniture upstairs", "Haul junk to the dump", "Move a heavy appliance"],
+    more: ["Unpack and arrange boxes", "Disassemble old furniture", "Help move a shed", "Stack firewood"],
+  },
+  {
+    id: "Cleaning & Tidying",
+    emoji: "✨",
+    title: "Cleaning & Tidying",
+    tagline: "House cleaning and organizing",
+    examples: ["Deep clean a kitchen", "Organize a cluttered basement", "Clean windows inside & out", "Vacuum and mop floors"],
+    more: ["Clean bathrooms", "Declutter a garage", "Laundry folding", "Post-reno cleanup"],
+  },
+  {
+    id: "Errands & Pickups",
+    emoji: "🛒",
+    title: "Errands & Pickups",
+    tagline: "Grocery runs, pickups, and local deliveries",
+    examples: ["Pick up groceries", "Return items to a store", "Pickup a prescription", "Drop off a package"],
+    more: ["Collect a Facebook Marketplace buy", "Pick up takeout", "Post office run", "Bank deposit"],
+  },
+  {
+    id: "Tech Help",
+    emoji: "💻",
+    title: "Tech Help",
+    tagline: "Computers, phones, and WiFi issues",
+    examples: ["Set up a new laptop", "Fix slow WiFi", "Transfer photos off a phone", "Install a printer"],
+    more: ["Set up a smart TV", "Recover a forgotten password", "Scan old photos", "Teach basic smartphone use"],
+  },
+  {
+    id: "Pet Help",
+    emoji: "🐾",
+    title: "Pet Help",
+    tagline: "Dog walking, pet sitting, and feeding",
+    examples: ["Walk a dog daily", "Pet sit while away", "Feed and check on cats", "Clean a fish tank"],
+    more: ["Bathe a dog", "Drive a pet to the vet", "Clean a litter box", "Groom a small dog"],
+  },
+  {
+    id: "Elderly Support",
+    emoji: "💛",
+    title: "Elderly Support",
+    tagline: "Companionship and light assistance",
+    examples: ["Drive to a doctor's appointment", "Help with grocery shopping", "Assist with medication reminders", "Friendly companionship visit"],
+    more: ["Help write a letter or email", "Light housework assistance", "Read aloud or play cards", "Help with phone or tablet"],
+  },
+  {
+    id: "Event & Occasion Help",
+    emoji: "🎉",
+    title: "Event Help",
+    tagline: "Party setup, decor, and event tasks",
+    examples: ["Set up chairs and tables", "Decorate for a birthday", "Help serve food at a party", "Clean up after an event"],
+    more: ["Assemble a tent or gazebo", "Help with yard sale setup", "Pick up event supplies", "Run errands day-of"],
+  },
+  {
+    id: "Quick Tasks",
+    emoji: "⚡",
+    title: "Quick Tasks",
+    tagline: "Small one-off jobs under an hour",
+    examples: ["Change a car tire", "Jump-start a battery", "Wait for a delivery", "Read a meter"],
+    more: ["Hold a ladder", "Help move one heavy item", "Take photos of a property", "Quick errand nearby"],
+  },
+  {
+    id: "Student & Everyday Support",
+    emoji: "🎓",
+    title: "Student Support",
+    tagline: "Tutoring, studying, and everyday help",
+    examples: ["Math or science tutoring", "Proofread an essay", "Help with a school project", "Study buddy session"],
+    more: ["Resume help", "Practice a language", "Help with a job application", "Teach a skill or hobby"],
+  },
+  {
+    id: "Other",
+    emoji: "💬",
+    title: "Other",
+    tagline: "Anything not listed above",
+    examples: ["Unique or custom task", "Something seasonal", "Local service not listed", "Ask — anything goes"],
+    more: [],
+  },
+];
+
+const POPULAR = [
+  { label: "Snow shoveling", categoryId: "Outdoor & Yard" },
+  { label: "Moving help", categoryId: "Moving & Heavy Help" },
+  { label: "Grocery pickup", categoryId: "Errands & Pickups" },
+  { label: "Yard cleanup", categoryId: "Outdoor & Yard" },
+  { label: "Tech help", categoryId: "Tech Help" },
+];
+
+// ─── CategoryPicker sub-component ────────────────────────────────────────────
+
+function CategoryPicker({
+  selected,
+  onSelect,
+}: {
+  selected: string;
+  onSelect: (id: string) => void;
+}) {
+  const [showMore, setShowMore] = useState(false);
+  const selectedDef = CATEGORY_DEFS.find((c) => c.id === selected);
+
+  // Reset "show more" when category changes
+  function pickCategory(id: string) {
+    setShowMore(false);
+    onSelect(id);
+  }
+
+  const displayExamples = showMore
+    ? [...(selectedDef?.examples ?? []), ...(selectedDef?.more ?? [])]
+    : (selectedDef?.examples ?? []);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm font-bold text-gray-700 mb-0.5">Category</p>
+        <p className="text-xs text-gray-500">
+          Choose the category that best matches your task. You can explain the details in the next step.
+        </p>
+      </div>
+
+      {/* Popular in Pictou County */}
+      <div className="bg-[#FFF8EE] border border-[#F5A623]/30 rounded-xl px-4 py-3">
+        <div className="flex items-center gap-1.5 mb-2.5">
+          <Flame className="w-3.5 h-3.5 text-[#F5A623]" />
+          <span className="text-xs font-bold text-[#B8760A] uppercase tracking-wider">Popular in Pictou County</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {POPULAR.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => pickCategory(p.categoryId)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                selected === p.categoryId
+                  ? "bg-[#F5A623] text-white border-[#F5A623]"
+                  : "bg-white text-gray-700 border-gray-200 hover:border-[#F5A623]/60 hover:text-[#B8760A]"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Category grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {CATEGORY_DEFS.map((cat) => {
+          const isSelected = selected === cat.id;
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => pickCategory(cat.id)}
+              className={`text-left p-3 rounded-xl border transition-all ${
+                isSelected
+                  ? "bg-[#1B2A4A] border-[#1B2A4A] text-white shadow-md"
+                  : "bg-white border-gray-200 text-gray-700 hover:border-[#1B2A4A]/40 hover:shadow-sm"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg leading-none">{cat.emoji}</span>
+                <span className={`text-sm font-bold leading-tight ${isSelected ? "text-white" : "text-[#1B2A4A]"}`}>
+                  {cat.title}
+                </span>
+              </div>
+              <p className={`text-[11px] leading-snug ${isSelected ? "text-white/70" : "text-gray-500"}`}>
+                {cat.tagline}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Example tasks for selected category */}
+      {selectedDef && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+            Example tasks — {selectedDef.title}
+          </p>
+          <ul className="space-y-1.5">
+            {displayExamples.map((ex) => (
+              <li key={ex} className="flex items-start gap-2 text-sm text-gray-700">
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-[#F5A623] shrink-0" />
+                {ex}
+              </li>
+            ))}
+          </ul>
+          {selectedDef.more.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowMore((v) => !v)}
+              className="mt-3 flex items-center gap-1 text-xs font-semibold text-[#1B2A4A] hover:underline"
+            >
+              {showMore ? (
+                <><ChevronUp className="w-3.5 h-3.5" /> Show fewer examples</>
+              ) : (
+                <><ChevronDown className="w-3.5 h-3.5" /> Show more examples</>
+              )}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Form constants ───────────────────────────────────────────────────────────
+
 const TOWNS = ["New Glasgow", "Stellarton", "Trenton", "Westville", "Pictou", "River John", "Abercrombie", "Scotsburn"];
 const DURATIONS = [
   { label: "Under 1 hour", value: 0.5 },
@@ -13,6 +249,8 @@ const DURATIONS = [
   { label: "Half day", value: 4 },
   { label: "Full day", value: 8 },
 ];
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PostTask() {
   const { user } = useAuth();
@@ -28,7 +266,7 @@ export default function PostTask() {
   const [form, setForm] = useState({
     title: "",
     description: "",
-    category: CATEGORIES[0],
+    category: CATEGORY_DEFS[0].id,
     pay: "",
     paymentMethod: "cash" as "cash" | "etransfer",
     estimatedHours: DURATIONS[0].value,
@@ -115,6 +353,12 @@ export default function PostTask() {
           />
         </div>
 
+        {/* Category picker */}
+        <CategoryPicker
+          selected={form.category}
+          onSelect={(id) => set("category", id)}
+        />
+
         {/* Description */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-1.5">Description <span className="text-red-500">*</span></label>
@@ -126,19 +370,6 @@ export default function PostTask() {
             maxLength={490}
             className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 resize-none"
           />
-        </div>
-
-        {/* Category */}
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1.5">Category</label>
-          <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map((cat) => (
-              <button type="button" key={cat} onClick={() => set("category", cat)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${form.category === cat ? "bg-[#1B2A4A] text-white border-[#1B2A4A]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
-                {cat}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Pay + method */}
@@ -216,12 +447,10 @@ export default function PostTask() {
               <span className="font-semibold text-gray-800">$2.00 CAD</span>
             </div>
             {totalDue && (
-              <>
-                <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-[#1B2A4A]">
-                  <span>Due today</span>
-                  <span>${totalDue} CAD</span>
-                </div>
-              </>
+              <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-[#1B2A4A]">
+                <span>Due today</span>
+                <span>${totalDue} CAD</span>
+              </div>
             )}
           </div>
           <div className="bg-[#1B2A4A]/5 border-t border-gray-200 px-4 py-2.5 flex items-center gap-2">
