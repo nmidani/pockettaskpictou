@@ -5,6 +5,30 @@ import { haversineKm } from "./haversine";
 const WINDOW_SECONDS = 30;
 const EXTENSION_SECONDS = 30;
 
+// Scoring weights — must sum to 100.
+const WEIGHT_DISTANCE = 40;
+const WEIGHT_FAIRNESS = 35;
+const WEIGHT_RATING   = 25;
+
+// Distance decay: half-life in km. Score = e^(-d / HALF_LIFE_KM).
+// At 0 km → 1.0 (full), at 5 km → 0.37, at 10 km → 0.14.
+// No 1/d singularity — someone 50m away can't score 20× a 1km applicant.
+const DISTANCE_HALF_LIFE_KM = 5;
+
+// Fairness saturates after FAIRNESS_CAP_HOURS (full boost for inactivity beyond this).
+const FAIRNESS_CAP_HOURS = 72;
+
+/**
+ * Compute a 0–100 composite score from three normalized factors.
+ *
+ * Distance  (40 pts) – exponential decay, no singularity. Unknown = neutral (0.5).
+ * Fairness  (35 pts) – hours since last completed task, capped at 72 h.
+ *                      Never completed a task → maximum boost.
+ * Rating    (25 pts) – 1–5 stars normalized to 0–1. Unknown = neutral (0.5).
+ *
+ * All three components are independently bounded to [0, weight], so no single
+ * factor can overwhelm the others regardless of the input values.
+ */
 function calcScore(opts: {
   distanceKm: number | null;
   hoursSinceLastTask: number | null;
@@ -12,19 +36,31 @@ function calcScore(opts: {
 }): number {
   const { distanceKm, hoursSinceLastTask, rating } = opts;
 
-  // Distance score: closer = higher. Default 10 km if unknown.
-  const dist = distanceKm != null && distanceKm > 0 ? distanceKm : 10;
-  const distScore = (1 / dist) * 50;
+  // ── Distance (0–40 pts) ────────────────────────────────────────────────────
+  // Exponential decay: score = e^(-d / halfLife). If location is unknown,
+  // award neutral credit (0.5) rather than penalising the applicant.
+  const distFactor =
+    distanceKm != null && distanceKm >= 0
+      ? Math.exp(-distanceKm / DISTANCE_HALF_LIFE_KM)
+      : 0.5;
+  const distScore = distFactor * WEIGHT_DISTANCE;
 
-  // Fairness score: longer since last task = higher priority (max benefit at 100 h).
-  const fairness = hoursSinceLastTask != null
-    ? Math.min(hoursSinceLastTask / 100, 1.0)
-    : 1.0; // Never done a task → maximum fairness boost
-  const fairnessScore = fairness * 30;
+  // ── Fairness (0–35 pts) ────────────────────────────────────────────────────
+  // Applicants who haven't completed a task recently get higher priority.
+  // "Never completed" → full boost. Recent completion → 0.
+  const fairnessFactor =
+    hoursSinceLastTask != null
+      ? Math.min(hoursSinceLastTask / FAIRNESS_CAP_HOURS, 1.0)
+      : 1.0;
+  const fairnessScore = fairnessFactor * WEIGHT_FAIRNESS;
 
-  // Rating score: 1-5 scale, default 3.0 for new users.
-  const rat = rating != null ? rating : 3.0;
-  const ratingScore = rat * 20;
+  // ── Rating (0–25 pts) ──────────────────────────────────────────────────────
+  // Normalise from the 1–5 scale to [0, 1]. New users (null) get neutral (0.5).
+  const ratingFactor =
+    rating != null
+      ? Math.max(0, Math.min((rating - 1) / 4, 1.0))
+      : 0.5;
+  const ratingScore = ratingFactor * WEIGHT_RATING;
 
   return distScore + fairnessScore + ratingScore;
 }
