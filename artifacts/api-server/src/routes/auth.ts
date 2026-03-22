@@ -68,6 +68,15 @@ function buildUserFromClaims(claims: Record<string, unknown>, role: "admin" | "u
   };
 }
 
+function isAdminEmail(email: string | null): boolean {
+  if (!email) return false;
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return adminEmails.includes(email.toLowerCase());
+}
+
 async function upsertUserAndGetRole(
   claims: Record<string, unknown>,
 ): Promise<"admin" | "user"> {
@@ -77,15 +86,22 @@ async function upsertUserAndGetRole(
   const lastName = (claims.last_name as string) || null;
   const profileImageUrl = ((claims.profile_image_url || claims.picture) as string) || null;
 
-  // Upsert into users table — preserve role if user already exists
+  // New users start as "user"; auto-promote if email is in the admin list
+  const defaultRole = isAdminEmail(email) ? "admin" : "user";
+
+  // Upsert into users table — preserve existing role unless this user is in ADMIN_EMAILS
   await db.execute(sql`
     INSERT INTO users (id, email, first_name, last_name, profile_image_url, role)
-    VALUES (${sub}, ${email}, ${firstName}, ${lastName}, ${profileImageUrl}, 'user')
+    VALUES (${sub}, ${email}, ${firstName}, ${lastName}, ${profileImageUrl}, ${defaultRole})
     ON CONFLICT (id) DO UPDATE SET
       email = COALESCE(EXCLUDED.email, users.email),
       first_name = COALESCE(EXCLUDED.first_name, users.first_name),
       last_name = COALESCE(EXCLUDED.last_name, users.last_name),
       profile_image_url = COALESCE(EXCLUDED.profile_image_url, users.profile_image_url),
+      role = CASE
+        WHEN ${defaultRole} = 'admin' THEN 'admin'
+        ELSE users.role
+      END,
       updated_at = NOW()
   `);
 
