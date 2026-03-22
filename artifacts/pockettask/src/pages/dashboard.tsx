@@ -26,7 +26,7 @@ function useCountdown(endsAt: string | null | undefined): number {
   useEffect(() => {
     if (!endsAt) { setSeconds(0); return; }
     function tick() {
-      const diff = Math.max(0, Math.floor((new Date(endsAt).getTime() - Date.now()) / 1000));
+      const diff = Math.max(0, Math.floor((new Date(endsAt!).getTime() - Date.now()) / 1000));
       setSeconds(diff);
     }
     tick();

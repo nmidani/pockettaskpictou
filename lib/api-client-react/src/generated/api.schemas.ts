@@ -15,6 +15,7 @@ export interface AuthUser {
   firstName?: string | null;
   lastName?: string | null;
   profileImage?: string | null;
+  role?: string | null;
 }
 
 export interface GetCurrentAuthUserResponse {
