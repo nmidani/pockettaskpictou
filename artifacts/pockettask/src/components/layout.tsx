@@ -91,10 +91,17 @@ export function Layout({ children }: { children: ReactNode }) {
                   <LogOut className="w-4 h-4 mr-1.5" />Log out
                 </Button>
                 <Link href="/profile">
-                  <Avatar className="w-9 h-9 border-2 border-[#1B2A4A]/20 cursor-pointer hover:opacity-80">
-                    <AvatarImage src={user?.profileImage ?? undefined} />
-                    <AvatarFallback className="bg-[#1B2A4A]/10 text-[#1B2A4A] text-xs font-bold">{initials}</AvatarFallback>
-                  </Avatar>
+                  <div className="relative">
+                    <Avatar className="w-9 h-9 border-2 border-[#1B2A4A]/20 cursor-pointer hover:opacity-80">
+                      <AvatarImage src={user?.profileImage ?? undefined} />
+                      <AvatarFallback className="bg-[#1B2A4A]/10 text-[#1B2A4A] text-xs font-bold">{initials}</AvatarFallback>
+                    </Avatar>
+                    {user?.role === "admin" && (
+                      <span className="absolute -bottom-1 -right-1 bg-[#F5A623] text-white text-[9px] font-bold leading-none px-1 py-0.5 rounded-full ring-1 ring-white">
+                        Admin
+                      </span>
+                    )}
+                  </div>
                 </Link>
               </>
             ) : (
@@ -114,10 +121,17 @@ export function Layout({ children }: { children: ReactNode }) {
         {!isLoading && (
           isAuthenticated ? (
             <Link href="/profile">
-              <Avatar className="w-8 h-8 border-2 border-[#1B2A4A]/20">
-                <AvatarImage src={user?.profileImage ?? undefined} />
-                <AvatarFallback className="bg-[#1B2A4A]/10 text-[#1B2A4A] text-xs font-bold">{initials}</AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="w-8 h-8 border-2 border-[#1B2A4A]/20">
+                  <AvatarImage src={user?.profileImage ?? undefined} />
+                  <AvatarFallback className="bg-[#1B2A4A]/10 text-[#1B2A4A] text-xs font-bold">{initials}</AvatarFallback>
+                </Avatar>
+                {user?.role === "admin" && (
+                  <span className="absolute -bottom-1 -right-1 bg-[#F5A623] text-white text-[9px] font-bold leading-none px-1 py-0.5 rounded-full ring-1 ring-white">
+                    Admin
+                  </span>
+                )}
+              </div>
             </Link>
           ) : (
             <Button onClick={() => setShowAuthModal(true)} size="sm" className="rounded-full bg-[#1B2A4A] text-xs px-3 h-8">Log in</Button>
