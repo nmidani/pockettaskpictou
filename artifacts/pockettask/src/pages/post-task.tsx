@@ -282,6 +282,8 @@ export default function PostTask() {
   const payValid = form.pay !== "" && !Number.isNaN(payNum) && payNum >= 1;
   const totalDue = payValid ? (payNum + 2).toFixed(2) : null;
 
+  const isAdmin = user?.role === "admin";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim() || !form.description.trim() || !form.pay) {
@@ -295,29 +297,47 @@ export default function PostTask() {
     setLoading(true);
     setRedirecting(false);
     setError(null);
+
+    const body = {
+      title: form.title,
+      description: form.description,
+      category: form.category,
+      pay: payNum,
+      paymentMethod: form.paymentMethod,
+      estimatedHours: form.estimatedHours,
+      town: form.town,
+      locationName: form.locationName || null,
+    };
+
     try {
-      const res = await fetch("/api/create-checkout-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          title: form.title,
-          description: form.description,
-          category: form.category,
-          pay: payNum,
-          paymentMethod: form.paymentMethod,
-          estimatedHours: form.estimatedHours,
-          town: form.town,
-          locationName: form.locationName || null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Could not start checkout. Please try again.");
-        return;
+      if (isAdmin) {
+        const res = await fetch("/api/admin-create-task", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Could not create task. Please try again.");
+          return;
+        }
+        setLocation(`/tasks/${data.taskId}?from=payment`);
+      } else {
+        const res = await fetch("/api/create-checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Could not start checkout. Please try again.");
+          return;
+        }
+        setRedirecting(true);
+        window.location.href = data.url;
       }
-      setRedirecting(true);
-      window.location.href = data.url;
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -434,30 +454,37 @@ export default function PostTask() {
         </div>
 
         {/* Fee breakdown */}
-        <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 space-y-2">
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>Task pay for worker</span>
-              <span className="font-semibold text-gray-800">
-                {payValid ? `$${payNum.toFixed(2)} CAD` : "—"}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>PocketTask posting fee</span>
-              <span className="font-semibold text-gray-800">$2.00 CAD</span>
-            </div>
-            {totalDue && (
-              <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-[#1B2A4A]">
-                <span>Due today</span>
-                <span>${totalDue} CAD</span>
+        {isAdmin ? (
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-green-600 shrink-0" />
+            <p className="text-sm text-green-800 font-medium">Admin — no posting fee. Task goes live instantly.</p>
+          </div>
+        ) : (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 space-y-2">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Task pay for worker</span>
+                <span className="font-semibold text-gray-800">
+                  {payValid ? `$${payNum.toFixed(2)} CAD` : "—"}
+                </span>
               </div>
-            )}
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>PocketTask posting fee</span>
+                <span className="font-semibold text-gray-800">$2.00 CAD</span>
+              </div>
+              {totalDue && (
+                <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-[#1B2A4A]">
+                  <span>Due today</span>
+                  <span>${totalDue} CAD</span>
+                </div>
+              )}
+            </div>
+            <div className="bg-[#1B2A4A]/5 border-t border-gray-200 px-4 py-2.5 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-[#1B2A4A]/60 shrink-0" />
+              <p className="text-xs text-gray-500">A small fee helps keep PocketTask safe and spam-free.</p>
+            </div>
           </div>
-          <div className="bg-[#1B2A4A]/5 border-t border-gray-200 px-4 py-2.5 flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[#1B2A4A]/60 shrink-0" />
-            <p className="text-xs text-gray-500">A small fee helps keep PocketTask safe and spam-free.</p>
-          </div>
-        </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>
@@ -475,6 +502,8 @@ export default function PostTask() {
             </span>
           ) : loading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
+          ) : isAdmin ? (
+            "Post Task →"
           ) : (
             "Continue to Payment →"
           )}
