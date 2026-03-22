@@ -5,6 +5,11 @@ dist
 # but keep pockettask's built frontend so deployment can serve it
 !artifacts/pockettask/dist/
 !artifacts/pockettask/dist/**
+# keep lib type declarations so Vercel/CI can resolve types without a pre-build step
+!lib/api-zod/dist/
+!lib/api-zod/dist/**
+!lib/db/dist/
+!lib/db/dist/**
 tmp
 out-tsc
 *.tsbuildinfo

@@ -1,0 +1,1 @@
+{"version":3,"file":"submitReportBody.d.ts","sourceRoot":"","sources":["../../../src/generated/types/submitReportBody.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,0BAA0B,EAAE,MAAM,8BAA8B,CAAC;AAE/E,MAAM,WAAW,gBAAgB;IAC/B,UAAU,EAAE,0BAA0B,CAAC;IACvC,QAAQ,EAAE,MAAM,CAAC;IACjB,MAAM,EAAE,MAAM,CAAC;IACf,OAAO,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;CACzB"}
