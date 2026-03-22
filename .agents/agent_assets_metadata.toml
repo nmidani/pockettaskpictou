@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "WXj822mi5ewOhufiUPkD9"
+uri = "file://pockettask.zip"
+type = "unspecified"
+title = "pockettask.zip — full project source (5.1 MB)"
