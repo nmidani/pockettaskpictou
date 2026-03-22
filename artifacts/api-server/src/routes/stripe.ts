@@ -10,7 +10,7 @@ const router: IRouter = Router();
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY not set");
-  return new Stripe(key, { apiVersion: "2025-02-24.acacia" });
+  return new Stripe(key, { apiVersion: "2026-02-25.clover" });
 }
 
 async function ensureProfile(userId: string) {

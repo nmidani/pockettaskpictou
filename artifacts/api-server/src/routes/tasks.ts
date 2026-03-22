@@ -191,11 +191,12 @@ router.post("/tasks/:id/apply", async (req, res) => {
     }
 
     // Check active task limit (max 2 assigned tasks at once)
-    const [activeCount] = await db.execute(sql`
+    const activeResult = await db.execute(sql`
       SELECT COUNT(*) as count FROM tasks
       WHERE (claimed_by_id = ${req.user.id} OR assigned_to_id = ${req.user.id})
         AND status IN ('claimed', 'in_progress')
     `);
+    const activeCount = activeResult.rows[0];
     if (Number((activeCount as any).count) >= 2) {
       res.status(400).json({ error: "You already have 2 active tasks. Complete one before applying to more." }); return;
     }
