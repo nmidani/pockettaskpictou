@@ -12,4 +12,5 @@ export interface AuthUser {
   firstName?: string | null;
   lastName?: string | null;
   profileImage?: string | null;
+  role: "admin" | "user";
 }

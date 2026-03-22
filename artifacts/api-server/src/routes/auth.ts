@@ -3,6 +3,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import {
   GetCurrentAuthUserResponse,
 } from "@workspace/api-zod";
+import { db, usersTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 import {
   clearSession,
   getOidcConfig,
@@ -53,7 +55,7 @@ function getSafeReturnTo(value: unknown): string {
   return value;
 }
 
-function buildUserFromClaims(claims: Record<string, unknown>) {
+function buildUserFromClaims(claims: Record<string, unknown>, role: "admin" | "user" = "user") {
   const sub = claims.sub as string;
   const username = (claims.username as string) || (claims.preferred_username as string) || sub;
   return {
@@ -62,7 +64,37 @@ function buildUserFromClaims(claims: Record<string, unknown>) {
     firstName: (claims.first_name as string) || null,
     lastName: (claims.last_name as string) || null,
     profileImage: ((claims.profile_image_url || claims.picture) as string) || null,
+    role,
   };
+}
+
+async function upsertUserAndGetRole(
+  claims: Record<string, unknown>,
+): Promise<"admin" | "user"> {
+  const sub = claims.sub as string;
+  const email = (claims.email as string) || null;
+  const firstName = (claims.first_name as string) || null;
+  const lastName = (claims.last_name as string) || null;
+  const profileImageUrl = ((claims.profile_image_url || claims.picture) as string) || null;
+
+  // Upsert into users table — preserve role if user already exists
+  await db.execute(sql`
+    INSERT INTO users (id, email, first_name, last_name, profile_image_url, role)
+    VALUES (${sub}, ${email}, ${firstName}, ${lastName}, ${profileImageUrl}, 'user')
+    ON CONFLICT (id) DO UPDATE SET
+      email = COALESCE(EXCLUDED.email, users.email),
+      first_name = COALESCE(EXCLUDED.first_name, users.first_name),
+      last_name = COALESCE(EXCLUDED.last_name, users.last_name),
+      profile_image_url = COALESCE(EXCLUDED.profile_image_url, users.profile_image_url),
+      updated_at = NOW()
+  `);
+
+  const [row] = await db
+    .select({ role: usersTable.role })
+    .from(usersTable)
+    .where(eq(usersTable.id, sub));
+
+  return (row?.role as "admin" | "user") ?? "user";
 }
 
 router.get("/auth/user", (req: Request, res: Response) => {
@@ -147,7 +179,9 @@ router.get("/callback", async (req: Request, res: Response) => {
     return;
   }
 
-  const user = buildUserFromClaims(claims as unknown as Record<string, unknown>);
+  const rawClaims = claims as unknown as Record<string, unknown>;
+  const role = await upsertUserAndGetRole(rawClaims);
+  const user = buildUserFromClaims(rawClaims, role);
 
   const now = Math.floor(Date.now() / 1000);
   const sessionData: SessionData = {
