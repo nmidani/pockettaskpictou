@@ -14,6 +14,7 @@ import TaskDetails from "./pages/task-details";
 import Profile from "./pages/profile";
 import Messages from "./pages/messages";
 import Guidelines from "./pages/guidelines";
+import AdminPanel from "./pages/admin";
 import NotFound from "./pages/not-found";
 
 const queryClient = new QueryClient({
@@ -50,6 +51,7 @@ function Router() {
         <Route path="/post-task">{() => <ProtectedRoute component={PostTask} />}</Route>
         <Route path="/profile">{() => <ProtectedRoute component={Profile} />}</Route>
         <Route path="/messages">{() => <ProtectedRoute component={Messages} />}</Route>
+        <Route path="/admin">{() => <ProtectedRoute component={AdminPanel} />}</Route>
         <Route component={NotFound} />
       </Switch>
     </Layout>

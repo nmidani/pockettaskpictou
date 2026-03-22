@@ -8,6 +8,7 @@ import messagesRouter from "./messages";
 import ratingsRouter from "./ratings";
 import reportsRouter from "./reports";
 import stripeRouter from "./stripe";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(messagesRouter);
 router.use(ratingsRouter);
 router.use(reportsRouter);
 router.use(stripeRouter);
+router.use(adminRouter);
 
 export default router;
