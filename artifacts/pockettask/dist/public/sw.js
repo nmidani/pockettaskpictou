@@ -1,8 +1,9 @@
-const CACHE_NAME = 'pockettask-v1';
+const CACHE_NAME = 'pockettask-v3';
+
+// Only pre-cache genuinely static files (no JS/CSS — they have hashed names and don't need pre-caching)
 const STATIC_ASSETS = [
-  '/',
-  '/manifest.json',
   '/favicon.svg',
+  '/manifest.json',
 ];
 
 self.addEventListener('install', (event) => {
@@ -13,6 +14,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  // Delete ALL old caches so stale index.html / stale assets are never served
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
@@ -27,11 +29,23 @@ self.addEventListener('fetch', (event) => {
 
   // Network-first for API calls
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(request).catch(() => new Response('{"error":"Offline"}', { headers: { 'Content-Type': 'application/json' } })));
+    event.respondWith(
+      fetch(request).catch(() =>
+        new Response('{"error":"Offline"}', { headers: { 'Content-Type': 'application/json' } })
+      )
+    );
     return;
   }
 
-  // Cache-first for static assets
+  // Network-first for HTML navigation — ensures fresh index.html on every deploy
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).catch(() => caches.match('/') || fetch(request))
+    );
+    return;
+  }
+
+  // Cache-first for hashed JS/CSS/image assets (safe because filenames change on each build)
   event.respondWith(
     caches.match(request).then((cached) => cached || fetch(request))
   );
