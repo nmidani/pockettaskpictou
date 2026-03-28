@@ -14,4 +14,16 @@ app.use(authMiddleware);
 
 app.use("/api", router);
 
+app.get("/", (_req, res) => {
+  res.json({
+    name: "PocketTask API",
+    status: "ok",
+    endpoints: {
+      health: "/api/healthz",
+      tasks: "/api/tasks",
+      auth: "/api/auth/user",
+    },
+  });
+});
+
 export default app;
