@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "PORT=8080 NODE_ENV=development tsx ./src/index.ts",
     "build": "tsx ./build.ts",
+    "build:client": "npm install --prefix client && npm run build --prefix client",
+    "build:all": "npm run build:client && npm run build",
     "start": "node dist/index.cjs",
     "typecheck": "tsc --noEmit",
     "db:push": "drizzle-kit push"
