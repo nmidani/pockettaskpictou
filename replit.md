@@ -4,50 +4,73 @@
 
 PocketTask — a hyper-local microtask platform for Pictou County, Nova Scotia. Neighbours post small tasks and locals/students accept them for extra money.
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Standalone Node.js API project using TypeScript, ready for Render deployment.
 
 ## Stack
 
-- **Monorepo tool**: pnpm workspaces
+- **Package manager**: npm
 - **Node.js version**: 24
-- **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
 - **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`)
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
-- **Frontend**: React + Vite + TailwindCSS
+- **Validation**: Zod
+- **Build**: esbuild (CJS bundle via build.ts)
 - **Auth**: Replit Auth (OIDC + PKCE)
-- **Map**: Mapbox GL + react-map-gl
-- **PWA**: Service worker + manifest
+- **Payments**: Stripe
 
 ## Structure
 
 ```text
-artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   ├── api-server/         # Express API server
-│   └── pockettask/         # React+Vite frontend (served at /)
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
+/
+├── src/                    # All backend source code
+│   ├── index.ts            # Server entry point (requires PORT env var)
+│   ├── app.ts              # Express app setup (CORS, middleware, /api router)
+│   ├── routes/             # Route handlers
+│   │   ├── index.ts, auth.ts, tasks.ts, users.ts
+│   │   ├── applications.ts, messages.ts, ratings.ts
+│   │   ├── reports.ts, stripe.ts, admin.ts, health.ts
+│   ├── middlewares/
+│   │   └── authMiddleware.ts
+│   ├── lib/                # Helpers
+│   │   ├── auth.ts, userInfo.ts, haversine.ts
+│   │   ├── trustScore.ts, assignmentScheduler.ts
 │   ├── db/                 # Drizzle ORM schema + DB connection
-│   └── replit-auth-web/    # Replit Auth browser hook
-├── scripts/                # Utility scripts
-├── pnpm-workspace.yaml
-├── tsconfig.base.json
-├── tsconfig.json
-└── package.json
+│   │   ├── index.ts
+│   │   └── schema/
+│   └── api-zod/            # Generated Zod schemas
+│       └── generated/
+├── dist/                   # Build output (git-ignored)
+│   └── index.cjs           # Single bundled file for production
+├── build.ts                # esbuild script → dist/index.cjs
+├── package.json            # Standalone Node.js app, no workspaces
+├── tsconfig.json           # rootDir: src, outDir: dist
+└── .npmrc
 ```
+
+## Scripts
+
+| Script | Command | Purpose |
+|---|---|---|
+| `dev` | `PORT=8080 NODE_ENV=development tsx ./src/index.ts` | Local development |
+| `build` | `tsx ./build.ts` | Bundle `src/` → `dist/index.cjs` |
+| `start` | `node dist/index.cjs` | Run production bundle |
+| `typecheck` | `tsc --noEmit` | Type-check without emitting |
+
+## Render Deployment
+
+- **Build command**: `npm install && npm run build`
+- **Start command**: `npm start`
+- **Root directory**: `/` (repo root)
 
 ## Database Schema
 
-- **sessions** — Replit Auth session store (sid, sess JSON, expire)
+- **sessions** — Auth session store (sid, sess JSON, expire)
 - **tasks** — Task listings (title, description, category, pay, status, lat/lng, location)
 - **applications** — Task applications (taskId, applicantId, message, status)
 - **user_profiles** — Extended user data (bio, phone, tasksPosted, tasksCompleted, rating)
+- **messages** — In-app messaging between task poster and applicant
+- **ratings** — Post-task ratings
+- **reports** — User and task reports
 
 ## API Routes
 
@@ -57,7 +80,7 @@ All routes served at `/api`:
 - `GET /login` — OIDC login
 - `GET /callback` — OIDC callback
 - `GET /logout` — logout
-- `GET /tasks` — list tasks (filter by status, category)
+- `GET /tasks` — list tasks (filter by status, category, lat/lng)
 - `POST /tasks` — create task (auth required)
 - `GET /tasks/:id` — task details
 - `PATCH /tasks/:id` — update task (owner only)
@@ -67,28 +90,26 @@ All routes served at `/api`:
 - `PATCH /applications/:id` — accept/reject application (task owner)
 - `GET /users/me` — current user profile (auth)
 - `PATCH /users/me` — update profile (auth)
-- `GET /users/me/tasks` — my posted tasks (auth)
-- `GET /users/me/applications` — my applications (auth)
-
-## Frontend Pages
-
-- `/` — Landing page (hero, how it works, categories)
-- `/dashboard` — Browse tasks + my activity (auth)
-- `/map` — Mapbox map of tasks in Pictou County
-- `/post-task` — Post a new task form (auth)
-- `/tasks/:id` — Task detail + apply + manage applications
-- `/profile` — User profile + stats
+- `GET /conversations` — list conversations (auth)
+- `GET /conversations/:id/messages` — message thread (auth)
+- `POST /conversations/:id/messages` — send message (auth)
+- `POST /ratings` — submit rating (auth)
+- `POST /reports` — submit report (auth)
+- `GET /admin/*` — admin routes (admin only)
+- `POST /stripe/webhook` — Stripe webhook
 
 ## Environment Variables Required
 
-- `DATABASE_URL` — PostgreSQL connection (auto-provisioned)
-- `VITE_MAPBOX_TOKEN` — Mapbox public token for map view
-- `REPL_ID` — Replit project ID (auto-set by Replit)
+- `PORT` — Server port (required, set by Render automatically)
+- `DATABASE_URL` — PostgreSQL connection string
+- `REPL_ID` — Replit project ID (for OIDC discovery)
+- `REPLIT_DOMAINS` — Allowed redirect domains
+- `SESSION_SECRET` — Express session secret
+- `STRIPE_SECRET_KEY` — Stripe API key
+- `ADMIN_EMAILS` — Comma-separated admin email addresses
 
-## TypeScript & Composite Projects
+## Colors / Branding
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists lib packages as project references.
-
-- **Always typecheck from the root** — run `pnpm run typecheck`
-- **Codegen**: `pnpm --filter @workspace/api-spec run codegen`
-- **DB push**: `pnpm --filter @workspace/db run push`
+- Navy: `#1B2A4A`
+- Amber: `#F5A623`
+- Off-white: `#F9F7F4`

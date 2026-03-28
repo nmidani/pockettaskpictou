@@ -1,20 +1,6 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
-
 # compiled output
 dist
-# but keep pockettask's built frontend so deployment can serve it
-!artifacts/pockettask/dist/
-!artifacts/pockettask/dist/**
-# keep lib type declarations so Vercel/CI can resolve types without a pre-build step
-!lib/api-zod/dist/
-!lib/api-zod/dist/**
-!lib/db/dist/
-!lib/db/dist/**
-tmp
-out-tsc
 *.tsbuildinfo
-.expo
-.expo-shared
 
 # dependencies
 node_modules
@@ -48,9 +34,6 @@ testem.log
 # System Files
 .DS_Store
 Thumbs.db
-
-.cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
 
 # Export archives
 *.zip
