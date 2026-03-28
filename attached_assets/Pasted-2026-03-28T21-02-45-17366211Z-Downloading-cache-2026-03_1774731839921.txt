@@ -1,0 +1,35 @@
+2026-03-28T21:02:45.17366211Z ==> Downloading cache...
+2026-03-28T21:02:45.232847035Z ==> Cloning from https://github.com/nmidani/pockettaskpictou
+2026-03-28T21:02:45.814227633Z ==> Checking out commit 6283bc831c45561ad1831bd624110f69c2e53aa7 in branch main
+2026-03-28T21:02:51.987808838Z ==> Downloaded 102MB in 4s. Extraction took 2s.
+2026-03-28T21:03:37.478868213Z ==> Using Node.js version 22.22.0 (default)
+2026-03-28T21:03:37.523047856Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-03-28T21:03:37.663526903Z ==> Running build command 'npm install && npm run build && npm run db:push'...
+2026-03-28T21:03:38.549806596Z 
+2026-03-28T21:03:38.549833776Z up to date, audited 122 packages in 815ms
+2026-03-28T21:03:38.549847157Z 
+2026-03-28T21:03:38.549857027Z 29 packages are looking for funding
+2026-03-28T21:03:38.549930958Z   run `npm fund` for details
+2026-03-28T21:03:38.583168659Z 
+2026-03-28T21:03:38.583190779Z 4 moderate severity vulnerabilities
+2026-03-28T21:03:38.58319546Z 
+2026-03-28T21:03:38.58320073Z To address all issues (including breaking changes), run:
+2026-03-28T21:03:38.58320569Z   npm audit fix --force
+2026-03-28T21:03:38.58320986Z 
+2026-03-28T21:03:38.58321475Z Run `npm audit` for details.
+2026-03-28T21:03:38.777194688Z 
+2026-03-28T21:03:38.777213778Z > pockettask-api@0.0.0 build
+2026-03-28T21:03:38.777217598Z > tsx ./build.ts
+2026-03-28T21:03:38.777220758Z 
+2026-03-28T21:03:39.114792799Z building server...
+2026-03-28T21:03:39.450909818Z 
+2026-03-28T21:03:39.450937259Z   dist/index.cjs  1.4mb ⚠️
+2026-03-28T21:03:39.450942988Z 
+2026-03-28T21:03:39.450947859Z ⚡ Done in 327ms
+2026-03-28T21:03:39.615955028Z npm error Missing script: "db:push"
+2026-03-28T21:03:39.615977219Z npm error
+2026-03-28T21:03:39.615982149Z npm error To see a list of scripts, run:
+2026-03-28T21:03:39.615987329Z npm error   npm run
+2026-03-28T21:03:39.61742283Z npm error A complete log of this run can be found in: /opt/render/.cache/_logs/2026-03-28T21_03_39_541Z-debug-0.log
+2026-03-28T21:03:39.670990022Z ==> Build failed 😞
+2026-03-28T21:03:39.671021753Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
