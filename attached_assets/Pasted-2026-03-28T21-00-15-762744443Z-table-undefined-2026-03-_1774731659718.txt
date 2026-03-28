@@ -1,0 +1,50 @@
+2026-03-28T21:00:15.762744443Z     table: undefined,
+2026-03-28T21:00:15.762748572Z     column: undefined,
+2026-03-28T21:00:15.762752793Z     dataType: undefined,
+2026-03-28T21:00:15.762756903Z     constraint: undefined,
+2026-03-28T21:00:15.762761203Z     file: 'parse_relation.c',
+2026-03-28T21:00:15.762765263Z     line: '1466',
+2026-03-28T21:00:15.762769193Z     routine: 'parserOpenTable'
+2026-03-28T21:00:15.762773113Z   }
+2026-03-28T21:00:15.762777343Z }
+2026-03-28T21:00:20.593320613Z [scheduler] Error processing expired windows: t [Error]: Failed query: select "id", "title", "description", "category", "pay", "payment_method", "estimated_hours", "status", "lat", "lng", "location_name", "town", "posted_by_id", "claimed_by_id", "claimed_at", "assigned_to_id", "assigned_at", "application_window_ends_at", "stripe_session_id", "created_at", "updated_at" from "tasks" where ("tasks"."status" = $1 and "tasks"."application_window_ends_at" < $2)
+2026-03-28T21:00:20.593365834Z params: open,2026-03-28T21:00:20.570Z
+2026-03-28T21:00:20.593371694Z     at Ly.queryWithCache (/opt/render/project/src/dist/index.cjs:66:32435)
+2026-03-28T21:00:20.593377065Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2026-03-28T21:00:20.593382015Z     at async /opt/render/project/src/dist/index.cjs:66:35676
+2026-03-28T21:00:20.593385925Z     at async Timeout.b6 [as _onTimeout] (/opt/render/project/src/dist/index.cjs:107:2589) {
+2026-03-28T21:00:20.593391695Z   query: 'select "id", "title", "description", "category", "pay", "payment_method", "estimated_hours", "status", "lat", "lng", "location_name", "town", "posted_by_id", "claimed_by_id", "claimed_at", "assigned_to_id", "assigned_at", "application_window_ends_at", "stripe_session_id", "created_at", "updated_at" from "tasks" where ("tasks"."status" = $1 and "tasks"."application_window_ends_at" < $2)',
+2026-03-28T21:00:20.593394975Z   params: [ 'open', '2026-03-28T21:00:20.570Z' ],
+2026-03-28T21:00:20.593397485Z   cause: error: relation "tasks" does not exist
+2026-03-28T21:00:20.593399985Z       at /opt/render/project/src/dist/index.cjs:59:15227
+2026-03-28T21:00:20.593402615Z       at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2026-03-28T21:00:20.593405115Z       at async /opt/render/project/src/dist/index.cjs:66:35885
+2026-03-28T21:00:20.593407625Z       at async Ly.queryWithCache (/opt/render/project/src/dist/index.cjs:66:32410)
+2026-03-28T21:00:20.593410125Z       at async /opt/render/project/src/dist/index.cjs:66:35676
+2026-03-28T21:00:20.593412555Z       at async Timeout.b6 [as _onTimeout] (/opt/render/project/src/dist/index.cjs:107:2589) {
+2026-03-28T21:00:20.593415095Z     length: 105,
+2026-03-28T21:00:20.593418195Z     severity: 'ERROR',
+2026-03-28T21:00:20.593420856Z     code: '42P01',
+2026-03-28T21:00:20.593423336Z     detail: undefined,
+2026-03-28T21:00:20.593425736Z     hint: undefined,
+2026-03-28T21:00:20.593428146Z     position: '306',
+2026-03-28T21:00:20.593431006Z     internalPosition: undefined,
+2026-03-28T21:00:20.593433446Z     internalQuery: undefined,
+2026-03-28T21:00:20.593435886Z     where: undefined,
+2026-03-28T21:00:20.593438526Z     schema: undefined,
+2026-03-28T21:00:20.593440976Z     table: undefined,
+2026-03-28T21:00:20.593444016Z     column: undefined,
+2026-03-28T21:00:20.593446596Z     dataType: undefined,
+2026-03-28T21:00:20.593449126Z     constraint: undefined,
+2026-03-28T21:00:20.593451546Z     file: 'parse_relation.c',
+2026-03-28T21:00:20.593454016Z     line: '1466',
+2026-03-28T21:00:20.593456187Z     routine: 'parserOpenTable'
+2026-03-28T21:00:20.593458196Z   }
+2026-03-28T21:00:20.593460267Z }
+2026-03-28T21:00:22.35246168Z ==> Your service is live 🎉
+2026-03-28T21:00:22.440907672Z ==> 
+2026-03-28T21:00:22.444182459Z ==> ///////////////////////////////////////////////////////////
+2026-03-28T21:00:22.447928869Z ==> 
+2026-03-28T21:00:22.451731814Z ==> Available at your primary URL https://pockettask-3.onrender.com
+2026-03-28T21:00:22.455605233Z ==> 
+2026-03-28T21:00:22.459418838Z ==> ///////////////////////////////////////////////////////////
