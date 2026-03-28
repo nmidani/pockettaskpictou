@@ -6,3 +6,9 @@ id = "WXj822mi5ewOhufiUPkD9"
 uri = "file://pockettask.zip"
 type = "unspecified"
 title = "pockettask.zip — full project source (5.1 MB)"
+
+[[outputs]]
+id = "5ErAMF8oPOBFQjv46Ficp"
+uri = "file://pockettask-api.tar.gz"
+type = "unspecified"
+title = "pockettask-api.tar.gz"
