@@ -7,17 +7,21 @@
     "dev": "PORT=8080 NODE_ENV=development tsx ./src/index.ts",
     "build": "tsx ./build.ts",
     "start": "node dist/index.cjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
     "cors": "^2",
+    "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",
+    "esbuild": "^0.27.3",
     "express": "^5",
     "openid-client": "^6.8.2",
     "pg": "^8.20.0",
     "stripe": "^20.4.1",
+    "tsx": "^4.21.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -26,9 +30,6 @@
     "@types/express": "^5.0.6",
     "@types/node": "^25.3.3",
     "@types/pg": "^8.18.0",
-    "drizzle-kit": "^0.31.9",
-    "esbuild": "^0.27.3",
-    "tsx": "^4.21.0",
     "typescript": "~5.9.2"
   }
 }
