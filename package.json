@@ -1,21 +1,34 @@
 {
-  "name": "workspace",
+  "name": "pockettask-api",
   "version": "0.0.0",
-  "license": "MIT",
-  "scripts": {
-    "start": "node artifacts/api-server/dist/index.cjs",
-    "build": "cd artifacts/api-server && npx tsx ./build.ts",
-    "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
-  },
-  "workspaces": [
-    "artifacts/api-server",
-    "artifacts/pockettask",
-    "lib/*"
-  ],
   "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_ENV=development tsx ./src/index.ts",
+    "build": "tsx ./build.ts",
+    "start": "node dist/index.cjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "cors": "^2",
+    "drizzle-orm": "^0.45.1",
+    "drizzle-zod": "^0.8.3",
+    "express": "^5",
+    "openid-client": "^6.8.2",
+    "pg": "^8.20.0",
+    "stripe": "^20.4.1",
+    "zod": "^3.25.76"
+  },
   "devDependencies": {
-    "typescript": "~5.9.2",
-    "prettier": "^3.8.1"
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.3.3",
+    "@types/pg": "^8.18.0",
+    "drizzle-kit": "^0.31.9",
+    "esbuild": "^0.27.3",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.2"
   }
 }
