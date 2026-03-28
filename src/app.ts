@@ -2,12 +2,10 @@ import express, { type Express } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
-import { fileURLToPath } from "url";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const clientDist = path.resolve(__dirname, "..", "client", "dist");
+const clientDist = path.resolve(process.cwd(), "client", "dist");
 
 const app: Express = express();
 
