@@ -1,0 +1,50 @@
+2026-03-28T20:35:44.488273282Z Run `npm audit` for details.
+2026-03-28T20:35:44.662862731Z 
+2026-03-28T20:35:44.662886001Z > pockettask-api@0.0.0 build
+2026-03-28T20:35:44.662890731Z > tsx ./build.ts
+2026-03-28T20:35:44.662894651Z 
+2026-03-28T20:35:44.899256942Z building server...
+2026-03-28T20:35:45.204484176Z 
+2026-03-28T20:35:45.204514357Z   dist/index.cjs  1.4mb ⚠️
+2026-03-28T20:35:45.204520697Z 
+2026-03-28T20:35:45.204527237Z ⚡ Done in 298ms
+2026-03-28T20:35:50.095545692Z ==> Uploading build...
+2026-03-28T20:35:59.954025502Z ==> Uploaded in 6.8s. Compression took 3.1s
+2026-03-28T20:36:00.006915545Z ==> Build successful 🎉
+2026-03-28T20:36:23.818070848Z ==> Deploying...
+2026-03-28T20:36:23.879895797Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-03-28T20:36:39.273629995Z ==> Running 'npm start'
+2026-03-28T20:36:40.280557658Z 
+2026-03-28T20:36:40.280592749Z > pockettask-api@0.0.0 start
+2026-03-28T20:36:40.280601139Z > node dist/index.cjs
+2026-03-28T20:36:40.280604309Z 
+2026-03-28T20:36:41.279001957Z WARNING: DATABASE_URL is not set. Database queries will fail until it is provided.
+2026-03-28T20:36:41.471885847Z PORT: 10000
+2026-03-28T20:36:41.473963342Z Server listening on port 10000
+2026-03-28T20:36:41.474080276Z [scheduler] Fair assignment scheduler started (5s interval)
+2026-03-28T20:36:41.574825174Z [scheduler] Error processing expired windows: t [Error]: Failed query: select "id", "title", "description", "category", "pay", "payment_method", "estimated_hours", "status", "lat", "lng", "location_name", "town", "posted_by_id", "claimed_by_id", "claimed_at", "assigned_to_id", "assigned_at", "application_window_ends_at", "stripe_session_id", "created_at", "updated_at" from "tasks" where ("tasks"."status" = $1 and "tasks"."application_window_ends_at" < $2)
+2026-03-28T20:36:41.574846764Z params: open,2026-03-28T20:36:41.474Z
+2026-03-28T20:36:41.574861465Z     at Ly.queryWithCache (/opt/render/project/src/dist/index.cjs:66:32435)
+2026-03-28T20:36:41.574864745Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2026-03-28T20:36:41.574867445Z     at async /opt/render/project/src/dist/index.cjs:66:35676
+2026-03-28T20:36:41.574869545Z     at async b6 (/opt/render/project/src/dist/index.cjs:107:2589) {
+2026-03-28T20:36:41.574873485Z   query: 'select "id", "title", "description", "category", "pay", "payment_method", "estimated_hours", "status", "lat", "lng", "location_name", "town", "posted_by_id", "claimed_by_id", "claimed_at", "assigned_to_id", "assigned_at", "application_window_ends_at", "stripe_session_id", "created_at", "updated_at" from "tasks" where ("tasks"."status" = $1 and "tasks"."application_window_ends_at" < $2)',
+2026-03-28T20:36:41.574875805Z   params: [ 'open', '2026-03-28T20:36:41.474Z' ],
+2026-03-28T20:36:41.574877935Z   cause: AggregateError [ECONNREFUSED]: 
+2026-03-28T20:36:41.574880125Z       at /opt/render/project/src/dist/index.cjs:59:15227
+2026-03-28T20:36:41.574882205Z       at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2026-03-28T20:36:41.574886426Z       at async /opt/render/project/src/dist/index.cjs:66:35885
+2026-03-28T20:36:41.574888576Z       at async Ly.queryWithCache (/opt/render/project/src/dist/index.cjs:66:32410)
+2026-03-28T20:36:41.574890566Z       at async /opt/render/project/src/dist/index.cjs:66:35676
+2026-03-28T20:36:41.574892736Z       at async b6 (/opt/render/project/src/dist/index.cjs:107:2589) {
+2026-03-28T20:36:41.574895316Z     code: 'ECONNREFUSED',
+2026-03-28T20:36:41.574897366Z     [errors]: [ [Error], [Error] ]
+2026-03-28T20:36:41.574899616Z   }
+2026-03-28T20:36:41.574901696Z }
+2026-03-28T20:36:45.643984074Z ==> Your service is live 🎉
+2026-03-28T20:36:45.716237227Z ==> 
+2026-03-28T20:36:45.718989078Z ==> ///////////////////////////////////////////////////////////
+2026-03-28T20:36:45.721556206Z ==> 
+2026-03-28T20:36:45.724026217Z ==> Available at your primary URL https://pockettask-3.onrender.com
+2026-03-28T20:36:45.72638423Z ==> 
+2026-03-28T20:36:45.729154702Z ==> ///////////////////////////////////////////////////////////
