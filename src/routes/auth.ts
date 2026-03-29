@@ -49,10 +49,19 @@ function setOidcCookie(res: Response, name: string, value: string) {
 }
 
 function getSafeReturnTo(value: unknown): string {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
-    return "/";
-  }
-  return value;
+  if (typeof value !== "string" || !value) return "/";
+  // Accept relative paths like /dashboard
+  if (value.startsWith("/") && !value.startsWith("//")) return value;
+  // Accept full same-origin URLs — strip to just the path
+  try {
+    const u = new URL(value);
+    const allowed = (process.env.REPLIT_DOMAINS ?? "").split(",").map(d => d.trim()).filter(Boolean);
+    allowed.push("pockettask-3.onrender.com");
+    if (allowed.some(d => u.hostname === d)) {
+      return u.pathname + u.search + u.hash || "/";
+    }
+  } catch {}
+  return "/";
 }
 
 function buildUserFromClaims(claims: Record<string, unknown>, role: "admin" | "user" = "user") {
@@ -122,10 +131,19 @@ router.get("/auth/user", (req: Request, res: Response) => {
 });
 
 router.get("/login", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
+  let config: Awaited<ReturnType<typeof getOidcConfig>>;
+  try {
+    config = await getOidcConfig();
+  } catch (err) {
+    console.error("[login] OIDC discovery failed:", err);
+    res.status(500).json({ error: "Auth configuration error. Check REPL_ID env var." });
+    return;
+  }
+
   const callbackUrl = `${getOrigin(req)}/api/callback`;
 
-  const returnTo = getSafeReturnTo(req.query.returnTo);
+  // Support both ?returnTo= (legacy) and ?redirect= (frontend)
+  const returnTo = getSafeReturnTo(req.query.returnTo ?? req.query.redirect);
 
   const state = oidc.randomState();
   const nonce = oidc.randomNonce();
