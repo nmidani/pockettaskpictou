@@ -21,8 +21,6 @@ if (!process.env.VERCEL) {
   } catch (error) {
     console.error("Startup error:", error);
   }
-} else {
-  startAssignmentScheduler();
 }
 
 export default app;
