@@ -10,10 +10,8 @@ import {
   getOidcConfig,
   getSessionId,
   createSession,
-  deleteSession,
   SESSION_COOKIE,
   SESSION_TTL,
-  ISSUER_URL,
   type SessionData,
 } from "../lib/auth";
 
@@ -50,13 +48,11 @@ function setOidcCookie(res: Response, name: string, value: string) {
 
 function getSafeReturnTo(value: unknown): string {
   if (typeof value !== "string" || !value) return "/";
-  // Accept relative paths like /dashboard
   if (value.startsWith("/") && !value.startsWith("//")) return value;
-  // Accept full same-origin URLs — strip to just the path
   try {
     const u = new URL(value);
     const allowed = (process.env.REPLIT_DOMAINS ?? "").split(",").map(d => d.trim()).filter(Boolean);
-    allowed.push("pockettask-3.onrender.com");
+    allowed.push("pockettaskpictou.vercel.app", "pockettask-3.onrender.com");
     if (allowed.some(d => u.hostname === d)) {
       return u.pathname + u.search + u.hash || "/";
     }
@@ -66,13 +62,17 @@ function getSafeReturnTo(value: unknown): string {
 
 function buildUserFromClaims(claims: Record<string, unknown>, role: "admin" | "user" = "user") {
   const sub = claims.sub as string;
-  const username = (claims.username as string) || (claims.preferred_username as string) || sub;
+  const email = (claims.email as string) || null;
+  const username =
+    (claims.preferred_username as string) ||
+    (claims.username as string) ||
+    (email ? email.split("@")[0] : sub);
   return {
     id: sub,
     username,
-    firstName: (claims.first_name as string) || null,
-    lastName: (claims.last_name as string) || null,
-    profileImage: ((claims.profile_image_url || claims.picture) as string) || null,
+    firstName: ((claims.given_name || claims.first_name) as string) || null,
+    lastName: ((claims.family_name || claims.last_name) as string) || null,
+    profileImage: ((claims.picture || claims.profile_image_url) as string) || null,
     role,
   };
 }
@@ -91,14 +91,12 @@ async function upsertUserAndGetRole(
 ): Promise<"admin" | "user"> {
   const sub = claims.sub as string;
   const email = (claims.email as string) || null;
-  const firstName = (claims.first_name as string) || null;
-  const lastName = (claims.last_name as string) || null;
-  const profileImageUrl = ((claims.profile_image_url || claims.picture) as string) || null;
+  const firstName = ((claims.given_name || claims.first_name) as string) || null;
+  const lastName = ((claims.family_name || claims.last_name) as string) || null;
+  const profileImageUrl = ((claims.picture || claims.profile_image_url) as string) || null;
 
-  // New users start as "user"; auto-promote if email is in the admin list
   const defaultRole = isAdminEmail(email) ? "admin" : "user";
 
-  // Upsert into users table — preserve existing role unless this user is in ADMIN_EMAILS
   await db.execute(sql`
     INSERT INTO users (id, email, first_name, last_name, profile_image_url, role)
     VALUES (${sub}, ${email}, ${firstName}, ${lastName}, ${profileImageUrl}, ${defaultRole})
@@ -136,13 +134,11 @@ router.get("/login", async (req: Request, res: Response) => {
     config = await getOidcConfig();
   } catch (err) {
     console.error("[login] OIDC discovery failed:", err);
-    res.status(500).json({ error: "Auth configuration error. Check REPL_ID env var." });
+    res.status(500).json({ error: "Auth configuration error. Check GOOGLE_CLIENT_ID env var." });
     return;
   }
 
   const callbackUrl = `${getOrigin(req)}/api/callback`;
-
-  // Support both ?returnTo= (legacy) and ?redirect= (frontend)
   const returnTo = getSafeReturnTo(req.query.returnTo ?? req.query.redirect);
 
   const state = oidc.randomState();
@@ -152,12 +148,13 @@ router.get("/login", async (req: Request, res: Response) => {
 
   const redirectTo = oidc.buildAuthorizationUrl(config, {
     redirect_uri: callbackUrl,
-    scope: "openid email profile offline_access",
+    scope: "openid email profile",
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
-    prompt: "login consent",
     state,
     nonce,
+    access_type: "offline",
+    prompt: "consent",
   });
 
   setOidcCookie(res, "code_verifier", codeVerifier);
@@ -168,8 +165,6 @@ router.get("/login", async (req: Request, res: Response) => {
   res.redirect(redirectTo.href);
 });
 
-// Query params are not validated because the OIDC provider may include
-// parameters not expressed in the schema.
 router.get("/callback", async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
@@ -222,7 +217,7 @@ router.get("/callback", async (req: Request, res: Response) => {
     user,
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
-    expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
+    expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : (claims.exp as number | undefined),
   };
 
   const sid = await createSession(sessionData);
@@ -231,18 +226,9 @@ router.get("/callback", async (req: Request, res: Response) => {
 });
 
 router.get("/logout", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const origin = getOrigin(req);
-
   const sid = getSessionId(req);
   await clearSession(res, sid);
-
-  const endSessionUrl = oidc.buildEndSessionUrl(config, {
-    client_id: process.env.REPL_ID!,
-    post_logout_redirect_uri: origin,
-  });
-
-  res.redirect(endSessionUrl.href);
+  res.redirect(getOrigin(req));
 });
 
 export default router;
