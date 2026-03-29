@@ -9,15 +9,20 @@ process.on("unhandledRejection", (err) => {
   console.error("Unhandled Rejection:", err);
 });
 
-console.log("PORT:", process.env.PORT);
-
 const port = Number(process.env.PORT) || 3000;
 
-try {
-  app.listen(port, () => {
-    console.log(`Server listening on port ${port}`);
-    startAssignmentScheduler();
-  });
-} catch (error) {
-  console.error("Startup error:", error);
+if (!process.env.VERCEL) {
+  console.log("PORT:", port);
+  try {
+    app.listen(port, () => {
+      console.log(`Server listening on port ${port}`);
+      startAssignmentScheduler();
+    });
+  } catch (error) {
+    console.error("Startup error:", error);
+  }
+} else {
+  startAssignmentScheduler();
 }
+
+export default app;
