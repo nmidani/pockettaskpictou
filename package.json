@@ -10,7 +10,8 @@
     "build:all": "npm run build:client && npm run build",
     "start": "node dist/index.cjs",
     "typecheck": "tsc --noEmit",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "vercel-build": "npm run build:all"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
