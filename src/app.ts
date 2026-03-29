@@ -5,6 +5,8 @@ import path from "path";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 
+const clientDist = path.resolve(process.cwd(), "client", "dist");
+
 const app: Express = express();
 
 app.use(cors({ credentials: true, origin: true }));
@@ -15,22 +17,15 @@ app.use(authMiddleware);
 
 app.use("/api", router);
 
-// Static file serving only when not on Vercel (Vercel CDN handles it there)
-if (!process.env.VERCEL) {
-  const clientDist = path.resolve(process.cwd(), "client", "dist");
-  app.use(express.static(clientDist));
-  app.use((_req, res) => {
-    const indexPath = path.join(clientDist, "index.html");
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        res.json({
-          name: "PocketTask API",
-          status: "ok",
-          endpoints: { health: "/api/healthz", tasks: "/api/tasks", auth: "/api/auth/user" },
-        });
-      }
-    });
+// Serve the built React frontend (works both locally and on Vercel via includeFiles)
+app.use(express.static(clientDist));
+app.use((_req, res) => {
+  const indexPath = path.join(clientDist, "index.html");
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      res.status(404).json({ error: "Not found" });
+    }
   });
-}
+});
 
 export default app;
