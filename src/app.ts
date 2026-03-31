@@ -2,6 +2,8 @@ import express, { type Express } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { db } from "./db";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 
@@ -27,5 +29,13 @@ app.use((_req, res) => {
     }
   });
 });
+
+// Run migrations on startup (idempotent — safe to run every cold start)
+if (process.env.DATABASE_URL) {
+  const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+  migrate(db, { migrationsFolder })
+    .then(() => console.log("[db] Migrations applied successfully"))
+    .catch((err) => console.error("[db] Migration failed:", err));
+}
 
 export default app;
