@@ -2,8 +2,27 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { useEffect } from "react";
+import { useEffect, Component, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(err: Error) { return { error: err.message }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#F9F7F4] p-6">
+          <div className="max-w-md text-center">
+            <h1 className="text-2xl font-bold text-[#1B2A4A] mb-2">Something went wrong</h1>
+            <p className="text-gray-500 text-sm mb-4">{this.state.error}</p>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-[#1B2A4A] text-white rounded-xl text-sm">Reload</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 import { Layout } from "./components/layout";
 import Landing from "./pages/landing";
@@ -58,14 +77,16 @@ function Router() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <WouterRouter>
-            <Router />
-          </WouterRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <WouterRouter>
+              <Router />
+            </WouterRouter>
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

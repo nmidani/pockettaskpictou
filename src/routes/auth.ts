@@ -242,8 +242,9 @@ router.get("/callback", async (req: Request, res: Response) => {
     setSessionCookie(res, sid);
     res.redirect(returnTo);
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error("[callback] Unhandled error:", err);
-    res.status(500).json({ error: "Login failed. Please try again." });
+    res.status(500).json({ error: "Login failed.", detail: msg });
   }
 });
 

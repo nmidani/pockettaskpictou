@@ -35,7 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetch(`${API_BASE}/api/auth/user`, { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
-        if (data && data.id) setUser(data as AuthUser);
+        // Server returns { user: AuthUser | null }
+        if (data?.user?.id) setUser(data.user as AuthUser);
         else setUser(null);
       })
       .catch(() => setUser(null))

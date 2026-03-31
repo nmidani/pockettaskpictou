@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";
-import { ArrowRight, MapPin, Star } from "lucide-react";
+import { ArrowRight, MapPin, Star, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AuthModal } from "@/components/auth-modal";
 
@@ -30,7 +30,15 @@ export default function Landing() {
     if (!isLoading && isAuthenticated) setLocation("/dashboard");
   }, [isLoading, isAuthenticated, setLocation]);
 
-  if (isLoading || isAuthenticated) return null;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F9F7F4]">
+        <Loader2 className="w-10 h-10 animate-spin text-[#1B2A4A]" />
+      </div>
+    );
+  }
+
+  if (isAuthenticated) return null;
 
   function openSignUp() { setModalMode("signup"); setShowModal(true); }
   function openSignIn() { setModalMode("signin"); setShowModal(true); }
