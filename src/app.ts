@@ -2,8 +2,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { db } from "./db";
+import { runMigrations } from "./db/migrate";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 
@@ -16,23 +15,20 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Run migrations once per cold start; block requests until done
+// Run migrations once per cold start; block requests until done (or 10s timeout)
 let migrationReady: Promise<void> | null = null;
 
 if (process.env.DATABASE_URL) {
-  const migrationsFolder = path.resolve(process.cwd(), "drizzle");
-  console.log("[db] Running migrations from:", migrationsFolder);
-  migrationReady = migrate(db, { migrationsFolder })
-    .then(() => console.log("[db] Migrations applied successfully"))
-    .catch((err) => console.error("[db] Migration failed (non-fatal):", err));
+  migrationReady = runMigrations().catch((err) =>
+    console.error("[db] Migration failed (non-fatal):", err),
+  );
 }
 
-// Wait for migration before processing requests (with 8s timeout so server can still start)
 app.use(async (_req: Request, _res: Response, next: NextFunction) => {
   if (migrationReady) {
     await Promise.race([
       migrationReady,
-      new Promise<void>((resolve) => setTimeout(resolve, 8000)),
+      new Promise<void>((resolve) => setTimeout(resolve, 10_000)),
     ]);
   }
   next();
