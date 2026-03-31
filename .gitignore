@@ -1,5 +1,6 @@
-# compiled output
-dist
+# compiled output — /dist is root-level only; client/dist is committed and served on Vercel
+/dist
+!client/dist
 *.tsbuildinfo
 
 # dependencies
