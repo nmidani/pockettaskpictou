@@ -53,7 +53,8 @@ app.use(
 );
 
 // ─── SPA catch-all: only for non-/api, non-/assets paths ─────────────────────
-app.get("*", (req: Request, res: Response) => {
+// Express 5 requires "/{*path}" — bare "*" is rejected by path-to-regexp v8
+app.get("/{*path}", (req: Request, res: Response) => {
   // If something under /api or /assets reached here, it genuinely doesn't exist
   if (req.path.startsWith("/api") || req.path.startsWith("/assets")) {
     return res.status(404).json({ error: "Not found" });
