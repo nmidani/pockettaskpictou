@@ -1,4 +1,5 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const app = require("../dist/index.cjs");
+const mod = require("../dist/index.cjs");
+const app = mod.default ?? mod;
 
 export default app;
