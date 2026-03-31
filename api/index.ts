@@ -1,1 +1,1 @@
-export { default } from "../src/app";
+export { default } from "../dist/index.cjs";
