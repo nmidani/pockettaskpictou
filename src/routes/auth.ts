@@ -168,64 +168,83 @@ router.get("/login", async (req: Request, res: Response) => {
 });
 
 router.get("/callback", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const callbackUrl =
-    process.env.CALLBACK_URL ?? `${getOrigin(req)}/api/callback`;
-
-  const codeVerifier = req.cookies?.code_verifier;
-  const nonce = req.cookies?.nonce;
-  const expectedState = req.cookies?.state;
-
-  if (!codeVerifier || !expectedState) {
-    res.redirect("/api/login");
-    return;
-  }
-
-  const currentUrl = new URL(
-    `${callbackUrl}?${new URL(req.url, `http://${req.headers.host}`).searchParams}`,
-  );
-
-  let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
   try {
-    tokens = await oidc.authorizationCodeGrant(config, currentUrl, {
-      pkceCodeVerifier: codeVerifier,
-      expectedNonce: nonce,
-      expectedState,
-      idTokenExpected: true,
-    });
-  } catch {
-    res.redirect("/api/login");
-    return;
+    let config: Awaited<ReturnType<typeof getOidcConfig>>;
+    try {
+      config = await getOidcConfig();
+    } catch (err) {
+      console.error("[callback] OIDC discovery failed:", err);
+      res.status(500).json({ error: "Auth configuration error." });
+      return;
+    }
+
+    const callbackUrl =
+      process.env.CALLBACK_URL ?? `${getOrigin(req)}/api/callback`;
+    console.log("[callback] callbackUrl:", callbackUrl, "req.url:", req.url);
+
+    const codeVerifier = req.cookies?.code_verifier;
+    const nonce = req.cookies?.nonce;
+    const expectedState = req.cookies?.state;
+
+    if (!codeVerifier || !expectedState) {
+      console.warn("[callback] Missing code_verifier or state cookie, redirecting to login");
+      res.redirect("/api/login");
+      return;
+    }
+
+    // Build the full callback URL with query params from the request
+    const reqUrl = new URL(req.url, `https://${req.headers.host}`);
+    const currentUrl = new URL(callbackUrl);
+    reqUrl.searchParams.forEach((v, k) => currentUrl.searchParams.set(k, v));
+    console.log("[callback] currentUrl:", currentUrl.toString());
+
+    let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
+    try {
+      tokens = await oidc.authorizationCodeGrant(config, currentUrl, {
+        pkceCodeVerifier: codeVerifier,
+        expectedNonce: nonce,
+        expectedState,
+        idTokenExpected: true,
+      });
+    } catch (err) {
+      console.error("[callback] Token exchange failed:", err);
+      res.redirect("/api/login");
+      return;
+    }
+
+    const returnTo = getSafeReturnTo(req.cookies?.return_to);
+
+    res.clearCookie("code_verifier", { path: "/" });
+    res.clearCookie("nonce", { path: "/" });
+    res.clearCookie("state", { path: "/" });
+    res.clearCookie("return_to", { path: "/" });
+
+    const claims = tokens.claims();
+    if (!claims) {
+      console.error("[callback] No claims in token response");
+      res.redirect("/api/login");
+      return;
+    }
+
+    const rawClaims = claims as unknown as Record<string, unknown>;
+    const role = await upsertUserAndGetRole(rawClaims);
+    const user = buildUserFromClaims(rawClaims, role);
+
+    const now = Math.floor(Date.now() / 1000);
+    const sessionData: SessionData = {
+      user,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : (claims.exp as number | undefined),
+    };
+
+    const sid = await createSession(sessionData);
+    setSessionCookie(res, sid);
+    res.redirect(returnTo);
+  } catch (err) {
+    console.error("[callback] Unhandled error:", err);
+    res.status(500).json({ error: "Login failed. Please try again." });
   }
-
-  const returnTo = getSafeReturnTo(req.cookies?.return_to);
-
-  res.clearCookie("code_verifier", { path: "/" });
-  res.clearCookie("nonce", { path: "/" });
-  res.clearCookie("state", { path: "/" });
-  res.clearCookie("return_to", { path: "/" });
-
-  const claims = tokens.claims();
-  if (!claims) {
-    res.redirect("/api/login");
-    return;
-  }
-
-  const rawClaims = claims as unknown as Record<string, unknown>;
-  const role = await upsertUserAndGetRole(rawClaims);
-  const user = buildUserFromClaims(rawClaims, role);
-
-  const now = Math.floor(Date.now() / 1000);
-  const sessionData: SessionData = {
-    user,
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
-    expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : (claims.exp as number | undefined),
-  };
-
-  const sid = await createSession(sessionData);
-  setSessionCookie(res, sid);
-  res.redirect(returnTo);
 });
 
 router.get("/logout", async (req: Request, res: Response) => {

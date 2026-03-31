@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
@@ -15,13 +15,35 @@ app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(authMiddleware);
 
+// Run migrations once per cold start; block requests until done
+let migrationReady: Promise<void> | null = null;
+
+if (process.env.DATABASE_URL) {
+  const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+  console.log("[db] Running migrations from:", migrationsFolder);
+  migrationReady = migrate(db, { migrationsFolder })
+    .then(() => console.log("[db] Migrations applied successfully"))
+    .catch((err) => console.error("[db] Migration failed (non-fatal):", err));
+}
+
+// Wait for migration before processing requests (with 8s timeout so server can still start)
+app.use(async (_req: Request, _res: Response, next: NextFunction) => {
+  if (migrationReady) {
+    await Promise.race([
+      migrationReady,
+      new Promise<void>((resolve) => setTimeout(resolve, 8000)),
+    ]);
+  }
+  next();
+});
+
+app.use(authMiddleware);
 app.use("/api", router);
 
 // Serve the built React frontend (works both locally and on Vercel via includeFiles)
 app.use(express.static(clientDist));
-app.use((_req, res) => {
+app.use((_req: Request, res: Response) => {
   const indexPath = path.join(clientDist, "index.html");
   res.sendFile(indexPath, (err) => {
     if (err) {
@@ -29,13 +51,5 @@ app.use((_req, res) => {
     }
   });
 });
-
-// Run migrations on startup (idempotent — safe to run every cold start)
-if (process.env.DATABASE_URL) {
-  const migrationsFolder = path.resolve(process.cwd(), "drizzle");
-  migrate(db, { migrationsFolder })
-    .then(() => console.log("[db] Migrations applied successfully"))
-    .catch((err) => console.error("[db] Migration failed:", err));
-}
 
 export default app;
