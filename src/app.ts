@@ -15,7 +15,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Run migrations once per cold start; block requests until done (or 10s timeout)
+// Run migrations once per cold start — promise is kept for /api routes to await
 let migrationReady: Promise<void> | null = null;
 
 if (process.env.DATABASE_URL) {
@@ -24,7 +24,9 @@ if (process.env.DATABASE_URL) {
   );
 }
 
-app.use(async (_req: Request, _res: Response, next: NextFunction) => {
+// ─── /api routes only: wait for migration + run auth ────────────────────────
+// Static asset requests NEVER hit the DB; they skip straight to express.static.
+app.use("/api", async (_req: Request, _res: Response, next: NextFunction) => {
   if (migrationReady) {
     await Promise.race([
       migrationReady,
@@ -34,17 +36,30 @@ app.use(async (_req: Request, _res: Response, next: NextFunction) => {
   next();
 });
 
-app.use(authMiddleware);
+app.use("/api", authMiddleware);
 app.use("/api", router);
 
-// Serve the built React frontend (works both locally and on Vercel via includeFiles)
-app.use(express.static(clientDist));
-app.use((_req: Request, res: Response) => {
-  const indexPath = path.join(clientDist, "index.html");
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      res.status(404).json({ error: "Not found" });
-    }
+// ─── Static file serving ─────────────────────────────────────────────────────
+// Must come after /api so API routes win, but before the SPA catch-all.
+app.use(
+  express.static(clientDist, {
+    // Hashed filenames in /assets/ are safe to cache forever
+    setHeaders(res, filePath) {
+      if (filePath.includes("/assets/")) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    },
+  }),
+);
+
+// ─── SPA catch-all: only for non-/api, non-/assets paths ─────────────────────
+app.get("*", (req: Request, res: Response) => {
+  // If something under /api or /assets reached here, it genuinely doesn't exist
+  if (req.path.startsWith("/api") || req.path.startsWith("/assets")) {
+    return res.status(404).json({ error: "Not found" });
+  }
+  res.sendFile(path.join(clientDist, "index.html"), (err) => {
+    if (err) res.status(404).json({ error: "Not found" });
   });
 });
 
