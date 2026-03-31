@@ -138,7 +138,9 @@ router.get("/login", async (req: Request, res: Response) => {
     return;
   }
 
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  const callbackUrl =
+    process.env.CALLBACK_URL ?? `${getOrigin(req)}/api/callback`;
+  console.log("[login] using callbackUrl:", callbackUrl);
   const returnTo = getSafeReturnTo(req.query.returnTo ?? req.query.redirect);
 
   const state = oidc.randomState();
@@ -167,7 +169,8 @@ router.get("/login", async (req: Request, res: Response) => {
 
 router.get("/callback", async (req: Request, res: Response) => {
   const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  const callbackUrl =
+    process.env.CALLBACK_URL ?? `${getOrigin(req)}/api/callback`;
 
   const codeVerifier = req.cookies?.code_verifier;
   const nonce = req.cookies?.nonce;
