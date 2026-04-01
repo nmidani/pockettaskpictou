@@ -18,12 +18,19 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    port: 5173,
+    port: Number(process.env.PORT) || 5173,
     host: "0.0.0.0",
     allowedHosts: true,
+    proxy: {
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: false,
+        secure: false,
+      },
+    },
   },
   preview: {
-    port: 4173,
+    port: Number(process.env.PORT) || 4173,
     host: "0.0.0.0",
     allowedHosts: true,
   },
