@@ -46,9 +46,12 @@ function setOidcCookie(res: Response, name: string, value: string) {
   });
 }
 
+const FRONTEND_URL =
+  process.env.FRONTEND_URL ?? "https://pockettaskpictou.vercel.app";
+
 function getSafeReturnTo(value: unknown): string {
-  if (typeof value !== "string" || !value) return "/";
-  if (value.startsWith("/") && !value.startsWith("//")) return value;
+  if (typeof value !== "string" || !value) return FRONTEND_URL;
+  if (value.startsWith("/") && !value.startsWith("//")) return FRONTEND_URL;
   try {
     const u = new URL(value);
     const allowed = (process.env.REPLIT_DOMAINS ?? "").split(",").map(d => d.trim()).filter(Boolean);
@@ -57,7 +60,7 @@ function getSafeReturnTo(value: unknown): string {
       return u.href;
     }
   } catch {}
-  return "/";
+  return FRONTEND_URL;
 }
 
 function buildUserFromClaims(claims: Record<string, unknown>, role: "admin" | "user" = "user") {
