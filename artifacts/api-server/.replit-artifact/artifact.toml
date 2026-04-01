@@ -1,21 +1,22 @@
 kind = "web"
-previewPath = "/"
-title = "PocketTask"
-version = "1.0.0"
-id = "artifacts/api-server"
-router = "path"
+  previewPath = "/api-server/"
+  title = "PocketTask"
+  version = "1.0.0"
+  id = "artifacts/api-server"
+  router = "path"
 
-[[services]]
-localPort = 3000
-name = "web"
-paths = ["/"]
+  [[services]]
+  localPort = 8081
+  name = "web"
+  paths = ["/api-server/", "/api/"]
 
-[services.development]
-run = "npm run dev"
+  [services.development]
+  run = "NODE_ENV=development tsx /home/runner/workspace/src/index.ts"
 
-[services.env]
-PORT = "3000"
+  [services.env]
+  PORT = "8081"
 
-[services.production]
-build = "npm run build:all"
-run = "npm start"
+  [services.production]
+  build = "npm run build:all"
+  run = "npm start"
+  
