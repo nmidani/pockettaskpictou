@@ -1,8 +1,14 @@
 export const API_BASE =
   (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 
-export async function apiFetch(path: string, options?: RequestInit) {
-  const res = await fetch(`${API_BASE}${path}`, {
+if (!API_BASE && import.meta.env.PROD) {
+  console.error(
+    "[PocketTask] VITE_API_URL is not set — API calls will fail in production!",
+  );
+}
+
+export async function apiFetch(url: string, options?: RequestInit) {
+  const res = await fetch(url, {
     credentials: "include",
     ...options,
     headers: {

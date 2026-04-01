@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "./api";
+import { apiFetch, API_BASE } from "./api";
 
 export interface Task {
   id: number;
@@ -41,14 +41,14 @@ export function useGetTasks(params?: Record<string, string>) {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
   return useQuery<Task[]>({
     queryKey: ["tasks", params],
-    queryFn: () => apiFetch(`/api/tasks${qs}`),
+    queryFn: () => apiFetch(`${API_BASE}/api/tasks${qs}`),
   });
 }
 
 export function useGetTask(id: number | string) {
   return useQuery<Task>({
     queryKey: ["tasks", id],
-    queryFn: () => apiFetch(`/api/tasks/${id}`),
+    queryFn: () => apiFetch(`${API_BASE}/api/tasks/${id}`),
     enabled: !!id,
   });
 }
@@ -56,21 +56,21 @@ export function useGetTask(id: number | string) {
 export function useGetMyPostedTasks() {
   return useQuery<Task[]>({
     queryKey: ["my-posted-tasks"],
-    queryFn: () => apiFetch("/api/users/me/tasks"),
+    queryFn: () => apiFetch(`${API_BASE}/api/users/me/tasks`),
   });
 }
 
 export function useGetMyApplications() {
   return useQuery<any[]>({
     queryKey: ["my-applications"],
-    queryFn: () => apiFetch("/api/users/me/applications"),
+    queryFn: () => apiFetch(`${API_BASE}/api/users/me/applications`),
   });
 }
 
 export function useGetMyProfile() {
   return useQuery<UserProfile>({
     queryKey: ["my-profile"],
-    queryFn: () => apiFetch("/api/users/me"),
+    queryFn: () => apiFetch(`${API_BASE}/api/users/me`),
   });
 }
 
@@ -82,7 +82,10 @@ export function useUpdateMyProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<UserProfile>) =>
-      apiFetch("/api/users/me", { method: "PATCH", body: JSON.stringify(data) }),
+      apiFetch(`${API_BASE}/api/users/me`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
     },
