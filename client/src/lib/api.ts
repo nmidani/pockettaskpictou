@@ -1,11 +1,8 @@
-export const API_BASE =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+const REPLIT_BACKEND =
+  "https://eba6143e-23d5-46c2-a20e-77d829c2e924-00-1ryndp5gw5xcb.worf.replit.dev";
 
-if (!API_BASE && import.meta.env.PROD) {
-  console.error(
-    "[PocketTask] VITE_API_URL is not set — API calls will fail in production!",
-  );
-}
+export const API_BASE: string =
+  (import.meta.env.VITE_API_URL as string | undefined) || REPLIT_BACKEND;
 
 export async function apiFetch(url: string, options?: RequestInit) {
   const res = await fetch(url, {
