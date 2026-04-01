@@ -18,7 +18,20 @@ const clientDist = path.resolve(__dirname, "..", "client", "dist");
 
 const app: Express = express();
 
-app.use(cors({ credentials: true, origin: true }));
+const ALLOWED_ORIGINS = [
+  "https://pockettaskpictou.vercel.app",
+  ...(process.env.CLIENT_ORIGIN ? [process.env.CLIENT_ORIGIN] : []),
+];
+
+app.use(
+  cors({
+    credentials: true,
+    origin: (origin, cb) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      cb(new Error(`CORS: origin not allowed — ${origin}`));
+    },
+  }),
+);
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

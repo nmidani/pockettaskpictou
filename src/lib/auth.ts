@@ -84,7 +84,7 @@ export async function clearSession(
   sid?: string,
 ): Promise<void> {
   if (sid) await deleteSession(sid);
-  res.clearCookie(SESSION_COOKIE, { path: "/" });
+  res.clearCookie(SESSION_COOKIE, { path: "/", secure: true, sameSite: "none" });
 }
 
 export function getSessionId(req: Request): string | undefined {

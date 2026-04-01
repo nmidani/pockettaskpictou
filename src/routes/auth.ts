@@ -30,7 +30,7 @@ function setSessionCookie(res: Response, sid: string) {
   res.cookie(SESSION_COOKIE, sid, {
     httpOnly: true,
     secure: true,
-    sameSite: "lax",
+    sameSite: "none",
     path: "/",
     maxAge: SESSION_TTL,
   });
@@ -40,7 +40,7 @@ function setOidcCookie(res: Response, name: string, value: string) {
   res.cookie(name, value, {
     httpOnly: true,
     secure: true,
-    sameSite: "lax",
+    sameSite: "none",
     path: "/",
     maxAge: OIDC_COOKIE_TTL,
   });
@@ -214,10 +214,11 @@ router.get("/callback", async (req: Request, res: Response) => {
 
     const returnTo = getSafeReturnTo(req.cookies?.return_to);
 
-    res.clearCookie("code_verifier", { path: "/" });
-    res.clearCookie("nonce", { path: "/" });
-    res.clearCookie("state", { path: "/" });
-    res.clearCookie("return_to", { path: "/" });
+    const clearOpts = { path: "/", secure: true, sameSite: "none" as const };
+    res.clearCookie("code_verifier", clearOpts);
+    res.clearCookie("nonce", clearOpts);
+    res.clearCookie("state", clearOpts);
+    res.clearCookie("return_to", clearOpts);
 
     const claims = tokens.claims();
     if (!claims) {
