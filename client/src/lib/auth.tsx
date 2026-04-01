@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, type ReactNode } from "react";
-import { API_BASE } from "./api";
+import { API_BASE, getStoredToken, storeToken, clearStoredToken } from "./api";
 
 interface AuthUser {
   id: string;
@@ -32,10 +32,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/auth/user`, { credentials: "include" })
+    // If the backend redirected back here with ?sid=..., capture and store it,
+    // then strip it from the URL so it's not exposed in the address bar.
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get("sid");
+    if (sid) {
+      storeToken(sid);
+      params.delete("sid");
+      const newSearch = params.toString();
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "") + window.location.hash;
+      window.history.replaceState({}, "", newUrl);
+    }
+
+    const token = getStoredToken();
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    if (token) {
+      (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+    }
+
+    fetch(`${API_BASE}/api/auth/user`, { credentials: "include", headers })
       .then((r) => r.json())
       .then((data) => {
-        // Server returns { user: AuthUser | null }
         if (data?.user?.id) setUser(data.user as AuthUser);
         else setUser(null);
       })
@@ -48,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    clearStoredToken();
     window.location.href = `${API_BASE}/api/logout`;
   };
 

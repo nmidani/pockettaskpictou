@@ -241,7 +241,21 @@ router.get("/callback", async (req: Request, res: Response) => {
 
     const sid = await createSession(sessionData);
     setSessionCookie(res, sid);
-    res.redirect(returnTo);
+
+    // Append sid to the redirect URL so cross-origin clients (e.g. Vercel frontend)
+    // can store it in localStorage and use it as a Bearer token, bypassing
+    // third-party cookie restrictions in modern browsers.
+    let redirectTarget = returnTo;
+    try {
+      const u = new URL(returnTo.startsWith("/") ? `${getOrigin(req)}${returnTo}` : returnTo);
+      u.searchParams.set("sid", sid);
+      redirectTarget = u.toString();
+    } catch {
+      redirectTarget = `${returnTo}${returnTo.includes("?") ? "&" : "?"}sid=${sid}`;
+    }
+
+    console.log(`[callback] success user=${user.id} redirectTarget=${redirectTarget}`);
+    res.redirect(redirectTarget);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[callback] Unhandled error:", err);

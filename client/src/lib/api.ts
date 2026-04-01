@@ -4,14 +4,34 @@ const REPLIT_BACKEND =
 export const API_BASE: string =
   (import.meta.env.VITE_API_URL as string | undefined) || REPLIT_BACKEND;
 
+const TOKEN_KEY = "pt_sid";
+
+export function getStoredToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function storeToken(sid: string): void {
+  localStorage.setItem(TOKEN_KEY, sid);
+}
+
+export function clearStoredToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
 export async function apiFetch(url: string, options?: RequestInit) {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options?.headers as Record<string, string> ?? {}),
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     credentials: "include",
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers ?? {}),
-    },
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
