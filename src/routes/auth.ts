@@ -54,7 +54,7 @@ function getSafeReturnTo(value: unknown): string {
     const allowed = (process.env.REPLIT_DOMAINS ?? "").split(",").map(d => d.trim()).filter(Boolean);
     allowed.push("pockettaskpictou.vercel.app", "pockettask-3.onrender.com");
     if (allowed.some(d => u.hostname === d)) {
-      return u.pathname + u.search + u.hash || "/";
+      return u.href;
     }
   } catch {}
   return "/";
