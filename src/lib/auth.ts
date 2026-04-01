@@ -20,10 +20,16 @@ let oidcConfig: client.Configuration | null = null;
 
 export async function getOidcConfig(): Promise<client.Configuration> {
   if (!oidcConfig) {
-    console.log("GOOGLE_CLIENT_ID exists:", !!process.env.GOOGLE_CLIENT_ID);
-    console.log("GOOGLE_CLIENT_SECRET exists:", !!process.env.GOOGLE_CLIENT_SECRET);
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.log("CHECK ENV:");
+    console.log("GOOGLE_CLIENT_ID:", clientId ? `${clientId.slice(0, 12)}... (length ${clientId.length})` : "MISSING");
+    console.log("GOOGLE_CLIENT_SECRET:", clientSecret ? `${clientSecret.slice(0, 4)}... (length ${clientSecret.length})` : "MISSING");
+    console.log("GOOGLE_CLIENT_ID truthy:", !!clientId);
+    console.log("GOOGLE_CLIENT_SECRET truthy:", !!clientSecret);
+
+    if (!clientId || !clientSecret) {
       throw new Error(
         "Missing required env vars: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set.",
       );
