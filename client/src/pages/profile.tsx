@@ -1,4 +1,5 @@
 import { useAuth } from "@/lib/auth";
+import { API_BASE } from "@/lib/api";
 import { useGetMyProfile, useUpdateMyProfile, getGetMyProfileQueryKey } from "@/lib/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
@@ -92,7 +93,7 @@ function PhoneVerification({ phone, isVerified, onVerified }: {
     setStep("sending");
     setError(null);
     try {
-      const res = await fetch("/api/users/me/phone/send-code", {
+      const res = await fetch(`${API_BASE}/api/users/me/phone/send-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -113,7 +114,7 @@ function PhoneVerification({ phone, isVerified, onVerified }: {
     setStep("verifying");
     setError(null);
     try {
-      const res = await fetch("/api/users/me/phone/verify", {
+      const res = await fetch(`${API_BASE}/api/users/me/phone/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -228,7 +229,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user?.id) return;
-    fetch(`/api/ratings/${user.id}`, { credentials: "include" })
+    fetch(`${API_BASE}/api/ratings/${user.id}`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => setRatings(d.ratings ?? []))
       .catch(() => {});
@@ -248,7 +249,7 @@ export default function Profile() {
   }
 
   async function handleReport() {
-    await fetch("/api/reports", {
+    await fetch(`${API_BASE}/api/reports`, {
       method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
       body: JSON.stringify({ targetType: "user", targetId: user?.id, reason: reportReason, details: null }),
     });

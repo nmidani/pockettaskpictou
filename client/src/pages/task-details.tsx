@@ -1,6 +1,7 @@
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useGetTask } from "@/lib/hooks";
+import { API_BASE } from "@/lib/api";
 import { useEffect, useRef, useState } from "react";
 import {
   Loader2, MapPin, Clock, Banknote, Smartphone, Star,
@@ -94,7 +95,7 @@ export default function TaskDetails() {
   async function fetchMessages() {
     if (!canChat || !isAuthenticated) return;
     try {
-      const res = await fetch(`/api/messages/${taskId}`, { credentials: "include" });
+      const res = await fetch(`${API_BASE}/api/messages/${taskId}`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages ?? []);
@@ -124,7 +125,7 @@ export default function TaskDetails() {
         lng = pos.coords.longitude;
       } catch {}
 
-      const res = await fetch(`/api/tasks/${taskId}/apply`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -145,7 +146,7 @@ export default function TaskDetails() {
   async function handleComplete() {
     setCompleting(true);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/complete`, { method: "POST", credentials: "include" });
+      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/complete`, { method: "POST", credentials: "include" });
       if (res.ok) {
         showToast("Task marked as completed!", "success");
         refetch();
@@ -160,7 +161,7 @@ export default function TaskDetails() {
     if (!msgInput.trim()) return;
     setSendingMsg(true);
     try {
-      const res = await fetch(`/api/messages/${taskId}`, {
+      const res = await fetch(`${API_BASE}/api/messages/${taskId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -181,7 +182,7 @@ export default function TaskDetails() {
     if (!ratedId) return;
     setSubmittingRating(true);
     try {
-      const res = await fetch("/api/ratings", {
+      const res = await fetch(`${API_BASE}/api/ratings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -197,7 +198,7 @@ export default function TaskDetails() {
   }
 
   async function handleReport() {
-    const res = await fetch("/api/reports", {
+    const res = await fetch(`${API_BASE}/api/reports`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",

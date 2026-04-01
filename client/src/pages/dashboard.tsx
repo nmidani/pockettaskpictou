@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { API_BASE } from "@/lib/api";
 import { useGetTasks, useGetMyPostedTasks, useGetMyApplications } from "@/lib/hooks";
 import { Task } from "@/lib/hooks";
 import { PlusCircle, MapPin, Clock, Banknote, Smartphone, CheckCircle2, AlertCircle, Loader2, Timer } from "lucide-react";
@@ -65,7 +66,7 @@ function TaskCard({ task, userId, onApplied }: { task: Task; userId?: string; on
         lng = pos.coords.longitude;
       } catch {}
 
-      const res = await fetch(`/api/tasks/${task.id}/apply`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${task.id}/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

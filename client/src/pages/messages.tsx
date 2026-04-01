@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { API_BASE } from "@/lib/api";
 import { MessageCircle, Loader2, Clock } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -20,7 +21,7 @@ export default function Messages() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    fetch("/api/users/me/messages", { credentials: "include" })
+    fetch(`${API_BASE}/api/users/me/messages`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => setConvos(d.conversations ?? []))
       .catch(() => {})

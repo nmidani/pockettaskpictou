@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { API_BASE } from "@/lib/api";
 import { Loader2, MapPin, Banknote, Smartphone, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -48,7 +49,7 @@ export default function PostTask() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/tasks", {
+      const res = await fetch(`${API_BASE}/api/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
