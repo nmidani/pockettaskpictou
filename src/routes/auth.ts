@@ -46,8 +46,10 @@ function setOidcCookie(res: Response, name: string, value: string) {
   });
 }
 
+const REPLIT_DOMAIN = (process.env.REPLIT_DOMAINS ?? "").split(",")[0].trim();
 const FRONTEND_URL =
-  process.env.FRONTEND_URL ?? "https://pockettaskpictou.vercel.app";
+  process.env.FRONTEND_URL ??
+  (REPLIT_DOMAIN ? `https://${REPLIT_DOMAIN}` : "https://pockettaskpictou.vercel.app");
 
 function getSafeReturnTo(value: unknown): string {
   if (typeof value !== "string" || !value) return FRONTEND_URL;
